@@ -93,13 +93,23 @@
     }
     button:hover { background: var(--accent-hover); }
     .footer { color: var(--muted); font-size: 0.8rem; text-align: center; margin-top: 22px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 22px; background: #111; border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+    .tabs a { flex: 1; text-align: center; padding: 8px 6px; border-radius: 7px; font-size: 0.82rem; color: var(--muted); text-decoration: none; font-weight: 600; }
+    .tabs a.active { background: var(--accent); color: #fff; }
+    .tabs a:hover:not(.active) { color: var(--text); }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="logo">MetaCheck<span class="dot">.</span></div>
     <h1>Pre-release Metadata Validator</h1>
-    <p class="subline">Upload your track metadata CSV to check for DSP errors before you distribute.</p>
+    <p class="subline">Check your track metadata for DSP errors before you distribute.</p>
+
+    <div class="tabs">
+      <a href="/" class="active">CSV upload</a>
+      <a href="/manual">Type it in</a>
+      <a href="/spotify">Search Spotify</a>
+    </div>
 
     {% if error %}
     <div class="error-banner">{{ error }}</div>

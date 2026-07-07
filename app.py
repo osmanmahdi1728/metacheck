@@ -27,8 +27,9 @@ import pandas as pd
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
 
+from validator import spotify
 from validator.humanize import humanize_errors, is_available
-from validator.pipeline import process_dataframe, summarize
+from validator.pipeline import EXPECTED_COLUMNS, process_dataframe, process_records, summarize
 
 load_dotenv()
 
@@ -41,9 +42,23 @@ app = Flask(__name__, template_folder=os.path.join(_BASE_DIR, "templates"))
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
 
+def _nav_context(**extra):
+    """Shared template context: which optional integrations are configured."""
+    ctx = {"ai_available": is_available(), "spotify_available": spotify.is_available()}
+    ctx.update(extra)
+    return ctx
+
+
+def _humanizer_if_requested():
+    """Return the GPT humanizer only if a key exists AND the user opted in."""
+    if is_available() and request.form.get("plain_language") == "on":
+        return humanize_errors
+    return None
+
+
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("upload_form.html", ai_available=is_available())
+    return render_template("upload_form.html", **_nav_context())
 
 
 @app.route("/validate", methods=["POST"])
@@ -51,27 +66,73 @@ def validate():
     uploaded = request.files.get("file")
 
     if uploaded is None or uploaded.filename == "":
-        return render_template("upload_form.html", ai_available=is_available(), error="Please choose a CSV file to upload."), 400
+        return render_template("upload_form.html", **_nav_context(error="Please choose a CSV file to upload.")), 400
 
     if not uploaded.filename.lower().endswith(".csv"):
-        return render_template("upload_form.html", ai_available=is_available(), error="That file isn't a CSV. Please upload a .csv file."), 400
+        return render_template("upload_form.html", **_nav_context(error="That file isn't a CSV. Please upload a .csv file.")), 400
 
     try:
         raw = uploaded.read()
         df = pd.read_csv(io.BytesIO(raw), dtype=str, keep_default_na=False)
     except Exception:
-        return render_template("upload_form.html", ai_available=is_available(), error="We couldn't read that CSV. Check that it's a valid, comma-separated file."), 400
+        return render_template("upload_form.html", **_nav_context(error="We couldn't read that CSV. Check that it's a valid, comma-separated file.")), 400
 
     if df.empty:
-        return render_template("upload_form.html", ai_available=is_available(), error="That CSV has no rows to validate."), 400
+        return render_template("upload_form.html", **_nav_context(error="That CSV has no rows to validate.")), 400
 
-    # Use the GPT rewrite only if the key exists AND the user opted in.
-    use_ai = is_available() and request.form.get("plain_language") == "on"
-    humanizer = humanize_errors if use_ai else None
+    results = process_dataframe(df, humanizer=_humanizer_if_requested())
+    return render_template("report.html", results=results, **summarize(results))
 
-    results = process_dataframe(df, humanizer=humanizer)
-    stats = summarize(results)
-    return render_template("report.html", results=results, **stats)
+
+@app.route("/manual", methods=["GET"])
+def manual():
+    return render_template("manual_form.html", **_nav_context(fields={}))
+
+
+@app.route("/validate-manual", methods=["POST"])
+def validate_manual():
+    record = {col: request.form.get(col, "").strip() for col in EXPECTED_COLUMNS + ["streams"]}
+
+    if not record.get("title") and not record.get("artist") and not record.get("isrc"):
+        return render_template("manual_form.html", **_nav_context(fields=record, error="Enter at least a title, artist, or ISRC.")), 400
+
+    results = process_records([record], humanizer=_humanizer_if_requested())
+    return render_template("report.html", results=results, **summarize(results))
+
+
+@app.route("/spotify", methods=["GET", "POST"])
+def spotify_search():
+    if not spotify.is_available():
+        return render_template("spotify_search.html", **_nav_context(configured=False))
+
+    if request.method == "GET":
+        return render_template("spotify_search.html", **_nav_context(configured=True))
+
+    query = request.form.get("query", "").strip()
+    if not query:
+        return render_template("spotify_search.html", **_nav_context(configured=True, error="Type a song name or artist to search.")), 400
+
+    try:
+        tracks = spotify.search_tracks(query)
+    except spotify.SpotifyError as exc:
+        return render_template("spotify_search.html", **_nav_context(configured=True, query=query, error=str(exc))), 502
+
+    return render_template("spotify_search.html", **_nav_context(configured=True, query=query, tracks=tracks))
+
+
+@app.route("/spotify/validate", methods=["POST"])
+def spotify_validate():
+    track_id = request.form.get("track_id", "").strip()
+    if not track_id:
+        return render_template("spotify_search.html", **_nav_context(configured=True, error="No track selected.")), 400
+
+    try:
+        record = spotify.get_track_metadata(track_id)
+    except spotify.SpotifyError as exc:
+        return render_template("spotify_search.html", **_nav_context(configured=True, error=str(exc))), 502
+
+    results = process_records([record], humanizer=_humanizer_if_requested())
+    return render_template("report.html", results=results, source="Spotify", **summarize(results))
 
 
 if __name__ == "__main__":

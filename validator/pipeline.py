@@ -23,10 +23,18 @@ ISRC_VALID_CODES_TO_SKIP_CMO = {"ISRC_MISSING", "ISRC_INVALID_FORMAT"}
 
 
 def process_dataframe(df, humanizer=None):
-    """Run the full validation + royalty pipeline over a DataFrame.
+    """Run the full pipeline over a pandas DataFrame (CSV upload path)."""
+    return process_records(df.to_dict("records"), humanizer=humanizer)
+
+
+def process_records(records, humanizer=None):
+    """Run the full validation + royalty pipeline over a list of dicts.
+
+    This is the shared core for every input method (CSV upload, manual form,
+    Spotify lookup) — they all reduce to a list of track dicts.
 
     Args:
-        df: pandas DataFrame of track metadata.
+        records: list of track metadata dicts.
         humanizer: optional callable(track_title, issues) -> issues that
             rewrites issue detail strings (e.g. via GPT-4o-mini). When None,
             raw validator messages are used.
@@ -35,8 +43,7 @@ def process_dataframe(df, humanizer=None):
         list of per-track result dicts consumed by the report template.
     """
     results = []
-    for _, row in df.iterrows():
-        track = row.to_dict()
+    for track in records:
         validation = validate_track(track)
         errors = list(validation["errors"])
         warnings = list(validation["warnings"])

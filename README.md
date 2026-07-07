@@ -12,6 +12,19 @@ See **[docs/royalty-flow.md](docs/royalty-flow.md)** for the full explanation
 of how royalties flow across borders (CMO → CMO → you) and exactly where the
 chain breaks for ~95% of independent artists — the gap MetaCheck fixes.
 
+## Three ways to enter a track
+
+No spreadsheet required — the web app has three input tabs, all feeding the
+same validation engine:
+
+1. **CSV upload** — bulk-check a whole catalogue.
+2. **Type it in** — a form for a single track; fill what you have, leave the
+   rest blank, and MetaCheck flags the gaps.
+3. **Search Spotify** — pull a real track's metadata by name. Spotify provides
+   the ISRC, release date, and explicit flag — but *not* composer, publisher,
+   or CMO registration, so those gaps show up live. (Requires free Spotify
+   credentials; see below.)
+
 ## What it checks
 
 - **Metadata rules** — ISRC format, contributor completeness, genre, explicit
@@ -43,11 +56,15 @@ metacheck/
 │   ├── rules.py                # the validation ruleset
 │   ├── cmo.py                  # CMO registration lookup
 │   ├── royalty.py              # royalty-at-risk estimator
+│   ├── spotify.py              # Spotify track lookup (optional)
 │   ├── humanize.py             # optional GPT-4o-mini plain-language layer
-│   └── pipeline.py             # shared processing used by CLI + web
+│   └── pipeline.py             # shared processing (CSV, manual, Spotify)
 ├── templates/
-│   ├── upload_form.html        # web upload page
+│   ├── upload_form.html        # CSV upload page
+│   ├── manual_form.html        # single-track entry form
+│   ├── spotify_search.html     # Spotify search + results
 │   └── report.html             # shared report template (web + CLI)
+├── tests/                      # pytest suite (rules, royalty, cmo, app, ...)
 ├── app.py                      # Flask web app (Step 2/3)
 ├── main.py                     # CLI: CSV -> report/output.html (Step 1)
 ├── vercel.json                 # Vercel deploy config (Step 3)
@@ -96,6 +113,30 @@ figure is labeled "(projected)".
 
 Release dates use `YYYY-MM-DD`. `explicit` and `ai_generated` must be
 `true` or `false`.
+
+## Optional: enable Spotify search
+
+1. Create a free app at
+   [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard).
+2. Copy its **Client ID** and **Client Secret** into `.env`:
+
+   ```
+   SPOTIFY_CLIENT_ID=...
+   SPOTIFY_CLIENT_SECRET=...
+   ```
+
+3. Restart the app. The "Search Spotify" tab becomes active. Uses the Client
+   Credentials flow (app-only, no user login).
+
+## Running the tests
+
+```bash
+pip install -r requirements.txt
+pytest
+```
+
+The suite covers the validation rules, royalty math, CMO lookup, the full
+pipeline, the Spotify metadata mapping, and the Flask routes (47 tests).
 
 ## Deploy to Vercel
 

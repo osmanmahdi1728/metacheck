@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MetaCheck — Type in a Track</title>
+  <style>
+    :root { --bg:#0f0f0f; --card:#1a1a1a; --border:#2a2a2a; --text:#fff; --muted:#9a9a9a; --accent:#7c3aed; --accent-hover:#8b4ff5; --danger:#f87171; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 40px; max-width: 560px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    .logo { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+    .logo .dot { color: var(--accent); }
+    h1 { font-size: 1.35rem; margin: 20px 0 8px; }
+    .subline { color: var(--muted); font-size: 0.95rem; margin: 0 0 22px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 22px; background: #111; border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+    .tabs a { flex: 1; text-align: center; padding: 8px 6px; border-radius: 7px; font-size: 0.82rem; color: var(--muted); text-decoration: none; font-weight: 600; }
+    .tabs a.active { background: var(--accent); color: #fff; }
+    .tabs a:hover:not(.active) { color: var(--text); }
+    .error-banner { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.4); color: var(--danger); padding: 12px 16px; border-radius: 10px; font-size: 0.9rem; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: 0.78rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    input, select { background: #111; border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 8px; font-size: 0.92rem; width: 100%; }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    .toggle { display: flex; align-items: center; gap: 10px; margin: 18px 0; font-size: 0.88rem; color: var(--muted); }
+    .toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+    button { width: 100%; background: var(--accent); color: #fff; border: none; padding: 14px; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 20px; }
+    button:hover { background: var(--accent-hover); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">MetaCheck<span class="dot">.</span></div>
+    <h1>Type in a track</h1>
+    <p class="subline">No spreadsheet needed — fill in what you have and leave the rest blank. MetaCheck flags the gaps.</p>
+
+    <div class="tabs">
+      <a href="/">CSV upload</a>
+      <a href="/manual" class="active">Type it in</a>
+      <a href="/spotify">Search Spotify</a>
+    </div>
+
+    {% if error %}
+    <div class="error-banner">{{ error }}</div>
+    {% endif %}
+
+    <form action="/validate-manual" method="POST">
+      <div class="grid">
+        <div class="field full">
+          <label for="title">Title</label>
+          <input id="title" name="title" value="{{ fields.title or '' }}" placeholder="Midnight Savanna" />
+        </div>
+        <div class="field full">
+          <label for="artist">Artist</label>
+          <input id="artist" name="artist" value="{{ fields.artist or '' }}" placeholder="SAFARIZMA" />
+        </div>
+        <div class="field">
+          <label for="isrc">ISRC</label>
+          <input id="isrc" name="isrc" value="{{ fields.isrc or '' }}" placeholder="QZ-ES1-26-00001" />
+        </div>
+        <div class="field">
+          <label for="streams">Streams (optional)</label>
+          <input id="streams" name="streams" value="{{ fields.streams or '' }}" placeholder="e.g. 340000" />
+        </div>
+        <div class="field">
+          <label for="composer">Composer</label>
+          <input id="composer" name="composer" value="{{ fields.composer or '' }}" placeholder="Songwriter name" />
+        </div>
+        <div class="field">
+          <label for="publisher">Publisher</label>
+          <input id="publisher" name="publisher" value="{{ fields.publisher or '' }}" placeholder="Publisher / self" />
+        </div>
+        <div class="field">
+          <label for="genre">Genre</label>
+          <input id="genre" name="genre" value="{{ fields.genre or '' }}" placeholder="Afro House" />
+        </div>
+        <div class="field">
+          <label for="release_date">Release date</label>
+          <input id="release_date" name="release_date" value="{{ fields.release_date or '' }}" placeholder="YYYY-MM-DD" />
+        </div>
+        <div class="field">
+          <label for="explicit">Explicit</label>
+          <select id="explicit" name="explicit">
+            <option value="" {{ 'selected' if not fields.explicit }}>—</option>
+            <option value="false" {{ 'selected' if fields.explicit == 'false' }}>false</option>
+            <option value="true" {{ 'selected' if fields.explicit == 'true' }}>true</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ai_generated">AI generated</label>
+          <select id="ai_generated" name="ai_generated">
+            <option value="" {{ 'selected' if not fields.ai_generated }}>—</option>
+            <option value="false" {{ 'selected' if fields.ai_generated == 'false' }}>false</option>
+            <option value="true" {{ 'selected' if fields.ai_generated == 'true' }}>true</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label for="language">Language (ISO 639-1)</label>
+          <input id="language" name="language" value="{{ fields.language or '' }}" placeholder="en" />
+        </div>
+      </div>
+
+      {% if ai_available %}
+      <label class="toggle">
+        <input type="checkbox" name="plain_language" checked />
+        Rewrite errors in plain language (GPT-4o-mini)
+      </label>
+      {% endif %}
+
+      <button type="submit">Run Validation</button>
+    </form>
+  </div>
+</body>
+</html>
