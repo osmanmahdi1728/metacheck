@@ -69,6 +69,9 @@
     }
     .chip b { color: #fff; }
     .chip-sub { color: #8b7bb0; font-size: 0.72rem; margin-left: 2px; }
+    .chip-tag { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; margin-left: 5px; padding: 1px 5px; border-radius: 4px; }
+    .chip-tag.real { color: #86efac; background: rgba(34, 197, 94, 0.15); }
+    .chip-tag.est { color: #fcd34d; background: rgba(234, 179, 8, 0.12); }
     .cmo-line { font-size: 0.82rem; margin: 0 0 12px; }
     .cmo-line.ok { color: #86efac; }
     .cmo-line.bad { color: #fca5a5; }
@@ -81,6 +84,62 @@
     .mb-callout b { color: #fff; }
     .mb-callout .src { color: var(--muted); font-size: 0.75rem; }
     .disclaimer { color: var(--muted); font-size: 0.78rem; margin-top: 30px; line-height: 1.5; }
+
+    /* Interactive royalty "what-if" tool */
+    .rtool-hint { color: #8b7bb0; font-size: 0.78rem; font-weight: 500; margin-left: auto; }
+    .rtool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 10px; }
+    @media (max-width: 640px) { .rtool-grid { grid-template-columns: 1fr; } }
+    .rtool-rows { display: flex; flex-direction: column; gap: 12px; }
+    .rtool-row {
+      background: rgba(124, 58, 237, 0.06); border: 1px solid rgba(124, 58, 237, 0.22);
+      border-radius: 10px; padding: 10px 12px;
+    }
+    .rr-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .rr-name { font-size: 0.85rem; font-weight: 600; color: #e9e2ff; display: flex; align-items: center; }
+    .rr-amt { font-size: 0.95rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+    .rr-controls { display: flex; align-items: center; gap: 10px; }
+    .rr-slider {
+      flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 3px;
+      background: #3a2f52; outline: none; cursor: pointer;
+    }
+    .rr-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 15px; height: 15px; border-radius: 50%;
+      background: var(--accent); border: 2px solid #cbb6ff; cursor: pointer;
+    }
+    .rr-slider::-moz-range-thumb {
+      width: 15px; height: 15px; border-radius: 50%; background: var(--accent);
+      border: 2px solid #cbb6ff; cursor: pointer;
+    }
+    .rr-num {
+      width: 92px; background: #141019; color: var(--text); border: 1px solid var(--border);
+      border-radius: 6px; padding: 5px 7px; font-size: 0.78rem; font-variant-numeric: tabular-nums;
+    }
+    .rr-remove {
+      background: none; border: none; color: #b98a8a; cursor: pointer; font-size: 0.95rem;
+      line-height: 1; padding: 0 2px;
+    }
+    .rr-remove:hover { color: var(--fail); }
+    .rtool-chartwrap {
+      background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    }
+    .rtool-chart-title { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .rtool-chart { width: 100%; height: auto; display: block; }
+    .rtool-chart text { fill: var(--muted); font-size: 10px; font-family: inherit; }
+    .rtool-chart .axis { stroke: #333; stroke-width: 1; }
+    .rtool-chart .grid { stroke: #262233; stroke-width: 1; }
+    .rtool-chart .area { fill: rgba(124, 58, 237, 0.18); }
+    .rtool-chart .line { stroke: var(--accent); stroke-width: 2; fill: none; }
+    .rtool-chart .ms-dot { fill: #cbb6ff; }
+    .rtool-chart .ms-label { fill: #d6c6ff; font-size: 9px; }
+    .rtool-chart .now-dot { fill: #fff; stroke: var(--accent); stroke-width: 2; }
+    .rtool-chart .now-label { fill: #fff; font-size: 10px; font-weight: 700; }
+    .rtool-foot { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+    .rtool-add, .rtool-reset {
+      background: #141019; color: #d6c6ff; border: 1px solid rgba(124, 58, 237, 0.35);
+      border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; cursor: pointer;
+    }
+    .rtool-add option { background: #141019; }
+    .rtool-reset:hover, .rtool-add:hover { border-color: var(--accent); }
   </style>
 </head>
 <body>
@@ -109,14 +168,43 @@
   {% for track in results %}
   <div class="track {{ track.status | lower }}">
     <h2>{{ track.title }} <span class="badge {{ track.status | lower }}">{{ track.status }}</span></h2>
-    <div class="meta">{{ track.artist }} &nbsp;·&nbsp; ISRC: {{ track.isrc }} &nbsp;·&nbsp; {{ "{:,}".format(track.streams) }} streams{% if track.streams_projected %} (projected){% endif %} &nbsp;·&nbsp; {{ track.error_count }} error(s), {{ track.warning_count }} warning(s)</div>
+    <div class="meta">{{ track.artist }} &nbsp;·&nbsp; ISRC: {{ track.isrc }} &nbsp;·&nbsp; {{ "{:,}".format(track.streams) }} streams{% if track.streams_measured %} (measured){% elif track.streams_projected %} (projected){% endif %} &nbsp;·&nbsp; {{ track.error_count }} error(s), {{ track.warning_count }} warning(s)</div>
 
     {% if track.royalty_at_risk > 0 %}
-    <div class="risk-banner">💸&nbsp; Estimated <strong>{{ track.royalty_at_risk_display }}</strong> in uncollected mechanical royalties on {{ "{:,}".format(track.streams) }} total streams{% if track.streams_projected %} (projected){% endif %}, split across platforms.</div>
-    <div class="risk-breakdown">
-      {% for line in track.royalty_breakdown %}
-      <span class="chip">{{ line.platform }}: <b>{{ line.amount_display }}</b> <span class="chip-sub">{{ line.streams_display }} streams</span></span>
-      {% endfor %}
+    <div class="rtool" data-rtool data-measured="{{ track.streams_measured | tojson }}">
+      <div class="risk-banner">💸&nbsp; Estimated <strong class="rtool-total">{{ track.royalty_at_risk_display }}</strong> in uncollected mechanical royalties on <span class="rtool-streams">{{ "{:,}".format(track.streams) }}</span> <span class="rtool-mode">{% if track.streams_measured %}measured{% elif track.streams_projected %}projected{% endif %}</span> streams. <span class="rtool-hint">← drag to model growth</span></div>
+
+      <div class="rtool-grid">
+        <div class="rtool-rows">
+          {% for line in track.royalty_breakdown %}
+          <div class="rtool-row" data-platform="{{ line.platform }}" data-rate="{{ line.rate }}">
+            <div class="rr-head">
+              <span class="rr-name">{{ line.platform }}{% if line.measured %} <span class="chip-tag real">real</span>{% elif track.streams_measured %} <span class="chip-tag est">est.</span>{% endif %}</span>
+              <span class="rr-amt">{{ line.amount_display }}</span>
+            </div>
+            <div class="rr-controls">
+              <input type="range" class="rr-slider" min="0" max="10000000" step="10000" value="{{ line.streams }}" aria-label="{{ line.platform }} streams">
+              <input type="number" class="rr-num" min="0" step="1000" value="{{ line.streams }}" aria-label="{{ line.platform }} streams exact">
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="rtool-chartwrap">
+          <div class="rtool-chart-title">Royalties at risk as the song grows</div>
+          <svg class="rtool-chart" viewBox="0 0 520 220" role="img" aria-label="Projected royalties at risk versus total streams"></svg>
+        </div>
+      </div>
+
+      <div class="rtool-foot">
+        <select class="rtool-add">
+          <option value="">+ Add platform…</option>
+          {% for name, rate in all_platform_rates.items() if name not in default_platforms %}
+          <option value="{{ name }}" data-rate="{{ rate }}">{{ name }} (~${{ "%.5f"|format(rate) }}/stream)</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="rtool-reset">Reset</button>
+      </div>
     </div>
     {% endif %}
 
@@ -152,13 +240,196 @@
   {% endfor %}
 
   <p class="disclaimer">
-    Royalty-at-risk figures estimate uncollected <strong>mechanical</strong> royalties. The total stream count
-    (real or projected) is split across platforms by a modeled market-share distribution (Spotify 45% /
-    Apple Music 25% / Audiomack 30%, Afro-market tilt), then priced with commonly-cited per-stream mechanical
-    rates (Spotify $0.000393, Apple Music $0.000456, Audiomack $0.00012). No free/official API exposes real
-    per-platform play counts, so the split is a defensible model, not measured data — plug in real per-artist
-    numbers to refine it. Figures illustrate downstream impact, not guaranteed amounts. CMO registration is
-    checked against a demo registry; production would query SOCAN / ASCAP / MCSK directly.
+    Royalty-at-risk figures estimate uncollected <strong>mechanical</strong> royalties, priced with
+    commonly-cited per-stream mechanical rates (Spotify $0.000393, Apple Music $0.000456, Audiomack $0.00012).
+    Platforms tagged <span class="chip-tag real">real</span> use measured per-platform stream counts (via
+    Soundcharts, when configured — it covers Spotify streams and Audiomack plays); platforms tagged
+    <span class="chip-tag est">est.</span> are estimated from the measured data by market share (Apple Music
+    publishes no play counts). With no measured data, the total stream count (real or projected) is split by a
+    modeled Afro-market distribution (Spotify 45% / Apple 25% / Audiomack 30%). Figures illustrate downstream
+    impact, not guaranteed amounts. CMO registration is checked against a demo registry; production would query
+    SOCAN / ASCAP / MCSK directly. The interactive tool lets you adjust each platform's streams (and add
+    more platforms) to model growth; added-platform rates are rough estimates you can tune.
   </p>
+
+  <script>
+    window.MC_RATES = {{ all_platform_rates | tojson }};
+  </script>
+  <script>
+    (function () {
+      var SVGNS = "http://www.w3.org/2000/svg";
+
+      function fmtUSD(n) {
+        n = Math.round(n * 100) / 100;
+        if (n === Math.round(n)) return "$" + Math.round(n).toLocaleString("en-US");
+        return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      function fmtNum(n) {
+        if (n >= 1e6) return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + "M";
+        if (n >= 1e3) return Math.round(n / 1e3) + "K";
+        return String(n);
+      }
+      function niceMax(s) {
+        var cands = [1e5, 2.5e5, 5e5, 1e6, 2.5e6, 5e6, 1e7, 2.5e7, 5e7, 1e8, 2.5e8, 5e8, 1e9];
+        var target = Math.max(s * 1.6, 2e5);
+        for (var i = 0; i < cands.length; i++) if (cands[i] >= target) return cands[i];
+        return target;
+      }
+      function el(tag, attrs, text) {
+        var e = document.createElementNS(SVGNS, tag);
+        for (var k in attrs) e.setAttribute(k, attrs[k]);
+        if (text != null) e.textContent = text;
+        return e;
+      }
+
+      function initTool(tool) {
+        var rowsBox = tool.querySelector(".rtool-rows");
+        var addSelect = tool.querySelector(".rtool-add");
+        var resetBtn = tool.querySelector(".rtool-reset");
+        var totalEl = tool.querySelector(".rtool-total");
+        var streamsEl = tool.querySelector(".rtool-streams");
+        var modeEl = tool.querySelector(".rtool-mode");
+        var svg = tool.querySelector(".rtool-chart");
+
+        var initialRows = rowsBox.innerHTML;
+        var initialOptions = addSelect.innerHTML;
+        var initialMode = modeEl ? modeEl.textContent : "";
+        var dirty = false;
+
+        function markDirty() {
+          if (!dirty && modeEl) { modeEl.textContent = "projected"; dirty = true; }
+        }
+        function maxStreams() {
+          var m = 0;
+          rowsBox.querySelectorAll(".rr-num").forEach(function (n) {
+            m = Math.max(m, parseInt(n.value || "0", 10) || 0);
+          });
+          return m;
+        }
+        function restoreOption(p) {
+          if (MC_RATES[p] == null) return;
+          var opt = document.createElement("option");
+          opt.value = p;
+          opt.setAttribute("data-rate", MC_RATES[p]);
+          opt.textContent = p + " (~$" + Number(MC_RATES[p]).toFixed(5) + "/stream)";
+          addSelect.appendChild(opt);
+        }
+        function createRow(platform, rate, streams, removable) {
+          var div = document.createElement("div");
+          div.className = "rtool-row";
+          div.setAttribute("data-platform", platform);
+          div.setAttribute("data-rate", rate);
+          div.innerHTML =
+            '<div class="rr-head"><span class="rr-name">' + platform + "</span>" +
+            '<span style="display:flex;align-items:center;gap:8px"><span class="rr-amt"></span>' +
+            (removable ? '<button type="button" class="rr-remove" title="Remove">✕</button>' : "") +
+            "</span></div>" +
+            '<div class="rr-controls">' +
+            '<input type="range" class="rr-slider" min="0" max="10000000" step="10000" value="' + streams + '">' +
+            '<input type="number" class="rr-num" min="0" step="1000" value="' + streams + '"></div>';
+          var s = div.querySelector(".rr-slider");
+          if (streams > +s.max) s.max = Math.ceil((streams * 1.5) / 10000) * 10000;
+          return div;
+        }
+        function wireRow(row) {
+          var slider = row.querySelector(".rr-slider");
+          var num = row.querySelector(".rr-num");
+          slider.addEventListener("input", function () { num.value = slider.value; markDirty(); recompute(); });
+          num.addEventListener("input", function () {
+            var v = Math.max(0, parseInt(num.value || "0", 10) || 0);
+            if (v > +slider.max) slider.max = Math.ceil((v * 1.5) / 10000) * 10000;
+            slider.value = Math.min(v, +slider.max);
+            markDirty(); recompute();
+          });
+          var rm = row.querySelector(".rr-remove");
+          if (rm) rm.addEventListener("click", function () {
+            var p = row.getAttribute("data-platform");
+            row.remove(); restoreOption(p); markDirty(); recompute();
+          });
+        }
+
+        function drawChart(totalRisk, totalStreams) {
+          svg.innerHTML = "";
+          var L = 54, R = 508, T = 14, B = 188, H = 220;
+          svg.appendChild(el("line", { class: "axis", x1: L, y1: B, x2: R, y2: B }));
+          svg.appendChild(el("line", { class: "axis", x1: L, y1: T, x2: L, y2: B }));
+          if (totalStreams <= 0 || totalRisk <= 0) {
+            svg.appendChild(el("text", { x: (L + R) / 2, y: (T + B) / 2, "text-anchor": "middle" }, "Set streams to see the projection"));
+            return;
+          }
+          var blended = totalRisk / totalStreams;
+          var xMax = niceMax(totalStreams);
+          var yMax = xMax * blended;
+          var px = function (s) { return L + (s / xMax) * (R - L); };
+          var py = function (v) { return B - (v / yMax) * (B - T); };
+
+          [0, 0.5, 1].forEach(function (f) {
+            var y = B - f * (B - T);
+            if (f > 0) svg.appendChild(el("line", { class: "grid", x1: L, y1: y, x2: R, y2: y }));
+            svg.appendChild(el("text", { x: L - 6, y: y + 3, "text-anchor": "end" }, fmtUSD(yMax * f)));
+          });
+          svg.appendChild(el("polygon", { class: "area", points: px(0) + "," + py(0) + " " + px(xMax) + "," + py(yMax) + " " + px(xMax) + "," + py(0) }));
+          svg.appendChild(el("line", { class: "line", x1: px(0), y1: py(0), x2: px(xMax), y2: py(yMax) }));
+
+          var ticks = [1e5, 2.5e5, 5e5, 1e6, 2.5e6, 5e6, 1e7, 2.5e7, 5e7, 1e8, 2.5e8, 5e8, 1e9].filter(function (c) {
+            return c <= xMax && c >= xMax * 0.06;
+          });
+          while (ticks.length > 5) ticks = ticks.filter(function (_, i) { return i % 2 === 0; });
+          ticks.forEach(function (s) {
+            svg.appendChild(el("text", { x: px(s), y: B + 13, "text-anchor": "middle" }, fmtNum(s)));
+            svg.appendChild(el("circle", { class: "ms-dot", cx: px(s), cy: py(s * blended), r: 2.5 }));
+            svg.appendChild(el("text", { class: "ms-label", x: px(s), y: py(s * blended) - 6, "text-anchor": "middle" }, fmtUSD(s * blended)));
+          });
+
+          var nx = px(totalStreams), ny = py(totalRisk);
+          svg.appendChild(el("circle", { class: "now-dot", cx: nx, cy: ny, r: 4 }));
+          var right = nx > R - 80;
+          svg.appendChild(el("text", { class: "now-label", x: right ? nx - 7 : nx + 7, y: Math.max(T + 10, ny - 9), "text-anchor": right ? "end" : "start" }, "You: " + fmtUSD(totalRisk)));
+          svg.appendChild(el("text", { x: (L + R) / 2, y: H - 2, "text-anchor": "middle" }, "total streams →"));
+        }
+
+        function recompute() {
+          var total = 0, totalStreams = 0;
+          rowsBox.querySelectorAll(".rtool-row").forEach(function (row) {
+            var rate = parseFloat(row.getAttribute("data-rate")) || 0;
+            var s = Math.max(0, parseInt(row.querySelector(".rr-num").value || "0", 10) || 0);
+            var amt = s * rate;
+            total += amt; totalStreams += s;
+            row.querySelector(".rr-amt").textContent = fmtUSD(amt);
+          });
+          if (totalEl) totalEl.textContent = fmtUSD(total);
+          if (streamsEl) streamsEl.textContent = totalStreams.toLocaleString("en-US");
+          drawChart(total, totalStreams);
+        }
+
+        rowsBox.querySelectorAll(".rtool-row").forEach(wireRow);
+        addSelect.addEventListener("change", function () {
+          var val = addSelect.value;
+          if (!val) return;
+          var rate = MC_RATES[val];
+          var streams = Math.max(0, Math.round(maxStreams() * 0.25));
+          var row = createRow(val, rate, streams, true);
+          rowsBox.appendChild(row);
+          wireRow(row);
+          var opt = addSelect.querySelector('option[value="' + (window.CSS && CSS.escape ? CSS.escape(val) : val) + '"]');
+          if (opt) opt.remove();
+          addSelect.value = "";
+          markDirty(); recompute();
+        });
+        resetBtn.addEventListener("click", function () {
+          rowsBox.innerHTML = initialRows;
+          addSelect.innerHTML = initialOptions;
+          if (modeEl) modeEl.textContent = initialMode;
+          dirty = false;
+          rowsBox.querySelectorAll(".rtool-row").forEach(wireRow);
+          recompute();
+        });
+
+        recompute();
+      }
+
+      document.querySelectorAll("[data-rtool]").forEach(initTool);
+    })();
+  </script>
 </body>
 </html>

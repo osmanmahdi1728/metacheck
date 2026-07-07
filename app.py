@@ -27,7 +27,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
 
-from validator import musicbrainz, spotify
+from validator import musicbrainz, royalty, soundcharts, spotify
 from validator.humanize import humanize_errors, is_available
 from validator.pipeline import EXPECTED_COLUMNS, process_dataframe, process_records, summarize
 
@@ -42,11 +42,32 @@ app = Flask(__name__, template_folder=os.path.join(_BASE_DIR, "templates"))
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
 
+@app.context_processor
+def inject_rates():
+    """Expose per-stream mechanical rates to the report's interactive tool."""
+    return {
+        "all_platform_rates": {**royalty.MECHANICAL_RATES, **royalty.EXTRA_MECHANICAL_RATES},
+        "default_platforms": list(royalty.MECHANICAL_RATES),
+    }
+
+
 def _nav_context(**extra):
     """Shared template context: which optional integrations are configured."""
-    ctx = {"ai_available": is_available(), "spotify_available": spotify.is_available()}
+    ctx = {
+        "ai_available": is_available(),
+        "spotify_available": spotify.is_available(),
+        "soundcharts_available": soundcharts.is_available(),
+    }
     ctx.update(extra)
     return ctx
+
+
+def _single_track_source():
+    """Human-readable data-source label for single-track (enriched) reports."""
+    parts = ["Spotify", "MusicBrainz"]
+    if soundcharts.is_available():
+        parts.append("Soundcharts")
+    return " + ".join(parts)
 
 
 def _humanizer_if_requested():
@@ -96,8 +117,13 @@ def validate_manual():
     if not record.get("title") and not record.get("artist") and not record.get("isrc"):
         return render_template("manual_form.html", **_nav_context(fields=record, error="Enter at least a title, artist, or ISRC.")), 400
 
-    results = process_records([record], humanizer=_humanizer_if_requested(), enricher=musicbrainz.enrich_by_isrc)
-    return render_template("report.html", results=results, **summarize(results))
+    results = process_records(
+        [record],
+        humanizer=_humanizer_if_requested(),
+        enricher=musicbrainz.enrich_by_isrc,
+        streams_fetcher=soundcharts.streams_by_isrc,
+    )
+    return render_template("report.html", results=results, source=_single_track_source(), **summarize(results))
 
 
 @app.route("/spotify", methods=["GET", "POST"])
@@ -131,8 +157,13 @@ def spotify_validate():
     except spotify.SpotifyError as exc:
         return render_template("spotify_search.html", **_nav_context(configured=True, error=str(exc))), 502
 
-    results = process_records([record], humanizer=_humanizer_if_requested(), enricher=musicbrainz.enrich_by_isrc)
-    return render_template("report.html", results=results, source="Spotify + MusicBrainz", **summarize(results))
+    results = process_records(
+        [record],
+        humanizer=_humanizer_if_requested(),
+        enricher=musicbrainz.enrich_by_isrc,
+        streams_fetcher=soundcharts.streams_by_isrc,
+    )
+    return render_template("report.html", results=results, source=_single_track_source(), **summarize(results))
 
 
 if __name__ == "__main__":

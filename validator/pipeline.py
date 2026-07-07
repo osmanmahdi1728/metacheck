@@ -27,7 +27,7 @@ def process_dataframe(df, humanizer=None):
     return process_records(df.to_dict("records"), humanizer=humanizer)
 
 
-def process_records(records, humanizer=None, enricher=None):
+def process_records(records, humanizer=None, enricher=None, streams_fetcher=None):
     """Run the full validation + royalty pipeline over a list of dicts.
 
     This is the shared core for every input method (CSV upload, manual form,
@@ -42,6 +42,10 @@ def process_records(records, humanizer=None, enricher=None):
             from a public database (e.g. MusicBrainz). Used to surface data
             the submission is missing. Skipped for tracks without a usable
             ISRC. Best used on single-track paths (it makes network calls).
+        streams_fetcher: optional callable(isrc) -> {platform: count} of REAL
+            per-platform streams (e.g. Soundcharts). When it returns data, the
+            royalty estimate uses those actual counts instead of the modeled
+            market-share split. Returns None to fall back to the model.
 
     Returns:
         list of per-track result dicts consumed by the report template.
@@ -90,11 +94,17 @@ def process_records(records, humanizer=None, enricher=None):
                     "source": "ISWC via MusicBrainz",
                 })
 
+        # Real per-platform streams (e.g. Soundcharts) — only with a usable ISRC.
+        platform_streams = None
+        if streams_fetcher is not None and isrc and not have_isrc_issue:
+            platform_streams = streams_fetcher(normalize_isrc(isrc))
+
         all_issues = errors + warnings
 
         # Royalty-at-risk estimate (keys off issue codes, so run before humanizing).
         streams, projected = parse_streams(track.get("streams"))
-        risk = estimate_risk([i["code"] for i in all_issues], streams)
+        risk = estimate_risk([i["code"] for i in all_issues], streams, platform_streams=platform_streams)
+        streams_measured = risk.get("measured", False)
 
         # Plain-language rewrite last (preserves codes).
         issues = humanizer(track.get("title", "Unknown"), all_issues) if humanizer else all_issues
@@ -108,8 +118,9 @@ def process_records(records, humanizer=None, enricher=None):
             "warning_count": len(warnings),
             "issues": issues,
             "cmo": cmo_info,
-            "streams": streams,
-            "streams_projected": projected,
+            "streams": risk["streams"],
+            "streams_projected": projected and not streams_measured,
+            "streams_measured": streams_measured,
             "royalty_at_risk": risk["amount"],
             "royalty_at_risk_display": format_usd(risk["amount"]),
             "royalty_breakdown": risk["breakdown"],

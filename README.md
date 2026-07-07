@@ -37,6 +37,19 @@ the work's **ISWC** (the international work code assigned at CMO/CISAC
 registration) from MusicBrainz — its presence is real evidence the composition
 is registered for collection.
 
+### Real per-platform streams (Soundcharts, optional/paid)
+
+By default the royalty estimate splits one stream figure across platforms by a
+modeled market-share distribution. Set `SOUNDCHARTS_APP_ID` and
+`SOUNDCHARTS_API_KEY` to replace that model with **real measured per-platform
+stream counts by ISRC** — Soundcharts covers Spotify streams and Audiomack plays
+(and other DSPs, including African ones), which Spotify's own API does not. When
+configured, each platform is priced against its actual count and tagged `real`;
+platforms with no public play count (e.g. Apple Music) are estimated from the
+measured anchor by market share and tagged `est.`. Without the keys, MetaCheck
+falls back to the model, so nothing breaks. Adapter lives in
+`validator/soundcharts.py`.
+
 ## What it checks
 
 - **Metadata rules** — ISRC format, contributor completeness, genre, explicit
@@ -49,12 +62,12 @@ is registered for collection.
   as unconfirmed. (Demo uses a local mock registry; swap in real CMO APIs in
   `validator/cmo.py`.)
 - **Royalty-at-risk estimate** — connects a broken/missing field to the money
-  it costs. The total stream count (real or projected) is split across platforms
-  by a modeled market-share distribution (Afro-market tilt by default) and priced
-  with per-platform per-stream mechanical rates, so each platform shows its own
-  stream slice and dollars. Override the split with real per-artist numbers via
-  `estimate_risk(shares=...)`. This is the layer DistroKid / TuneCore / LANDR
-  don't have.
+  it costs. Uses real measured per-platform streams when Soundcharts is
+  configured (see above); otherwise splits the total (real or projected) across
+  platforms by a modeled Afro-market distribution and prices each with
+  per-platform per-stream mechanical rates. Override the split with real numbers
+  via `estimate_risk(shares=...)` or `estimate_risk(platform_streams=...)`. This
+  is the layer DistroKid / TuneCore / LANDR don't have.
 - **Plain-language rewrite** — optional GPT-4o-mini pass that turns error codes
   into artist-friendly guidance. Works without a key (falls back to built-in
   messages).
@@ -77,6 +90,7 @@ metacheck/
 │   ├── royalty.py              # royalty-at-risk estimator
 │   ├── spotify.py              # Spotify track lookup (optional)
 │   ├── musicbrainz.py          # real composer/work enrichment by ISRC
+│   ├── soundcharts.py          # real per-platform streams by ISRC (optional/paid)
 │   ├── humanize.py             # optional GPT-4o-mini plain-language layer
 │   └── pipeline.py             # shared processing (CSV, manual, Spotify)
 ├── templates/

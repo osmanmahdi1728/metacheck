@@ -18,6 +18,18 @@ MECHANICAL_RATES = {
     "Audiomack": 0.00012,
 }
 
+# Additional platforms offered in the interactive "what-if" tool on the report
+# page (client-side only). These are rough, commonly-cited per-stream mechanical
+# estimates — adjust freely. They are NOT used by the server-side default
+# estimate, which sticks to MECHANICAL_RATES above.
+EXTRA_MECHANICAL_RATES = {
+    "YouTube Music": 0.00008,
+    "Amazon Music": 0.00040,
+    "Deezer": 0.00035,
+    "Tidal": 0.00050,
+    "Boomplay": 0.00010,
+}
+
 # How a track's TOTAL cross-platform streams are distributed across platforms.
 # A single stream figure isn't "Spotify streams" — it's the track's plays, split
 # across the services people actually use. These are modeled shares tilted for
@@ -70,58 +82,99 @@ def parse_streams(value):
         return DEFAULT_PROJECTED_STREAMS, True
 
 
-def estimate_risk(issue_codes, streams, shares=None):
+def estimate_risk(issue_codes, streams, shares=None, platform_streams=None):
     """Estimate uncollected mechanical royalties for one track.
 
-    The `streams` figure is treated as the track's TOTAL cross-platform plays
-    and distributed across platforms by `shares` (a market-share split), so each
-    platform is priced against its own realistic slice of the streams rather than
-    the full count. Override `shares` with real per-artist numbers when available.
+    Two modes, in priority order:
+
+    1. Real per-platform data (`platform_streams`, e.g. from Soundcharts): each
+       measured platform is priced against its ACTUAL stream/play count. For a
+       platform we couldn't measure (e.g. Apple Music, which publishes no play
+       counts), we estimate it from the largest measured platform using the
+       market-share ratio, and flag it as estimated.
+    2. Modeled split (default): `streams` is treated as the track's TOTAL
+       cross-platform plays and distributed across platforms by `shares`.
 
     Args:
         issue_codes: iterable of issue code strings found for the track.
-        streams: integer TOTAL stream count (real or projected).
-        shares: optional {platform: weight} override. Defaults to
-            PLATFORM_STREAM_SHARE. Weights are normalized over the platforms we
-            have rates for, so they need not sum to 1.
+        streams: integer TOTAL stream count (real or projected). Used for the
+            modeled split and as a fallback.
+        shares: optional {platform: weight} override for the modeled split.
+            Weights are normalized, so they need not sum to 1.
+        platform_streams: optional {platform: count} of REAL measured streams.
 
     Returns:
-        dict with total USD at risk and a per-platform breakdown (each entry
-        carries that platform's stream slice). Returns amount 0.0 with an empty
-        breakdown when nothing is at risk.
+        dict with total USD at risk, a per-platform breakdown (each entry flags
+        `measured`), the effective total `streams`, and a `measured` bool.
+        Returns amount 0.0 with an empty breakdown when nothing is at risk.
     """
     codes = set(issue_codes)
     if not (codes & MECHANICAL_RISK_CODES):
-        return {"amount": 0.0, "streams": streams, "breakdown": [], "at_risk": False}
+        return {"amount": 0.0, "streams": streams, "breakdown": [], "at_risk": False, "measured": False}
 
     weights = shares or PLATFORM_STREAM_SHARE
-    # Only distribute over platforms we can actually price.
     priced = {p: weights.get(p, 0.0) for p in MECHANICAL_RATES}
     total_weight = sum(priced.values()) or 1.0
 
+    measured = {
+        p: int(v) for p, v in (platform_streams or {}).items()
+        if p in MECHANICAL_RATES and isinstance(v, (int, float)) and v >= 0
+    }
+
+    per_platform, is_measured = _resolve_platform_streams(streams, priced, total_weight, measured)
+
     breakdown = []
-    total = 0.0
+    total_amount = 0.0
+    total_streams = 0
     for platform, rate in MECHANICAL_RATES.items():
-        share = priced[platform] / total_weight
-        platform_streams = int(round(streams * share))
-        amount = round(platform_streams * rate, 2)
-        total += amount
+        count = per_platform[platform]
+        amount = round(count * rate, 2)
+        total_amount += amount
+        total_streams += count
         breakdown.append({
             "platform": platform,
-            "streams": platform_streams,
-            "streams_display": f"{platform_streams:,}",
-            "share": round(share, 4),
+            "streams": count,
+            "streams_display": f"{count:,}",
+            "share": round(priced[platform] / total_weight, 4),
+            "measured": is_measured[platform],
             "amount": amount,
             "amount_display": format_usd(amount),
             "rate": rate,
         })
 
     return {
-        "amount": round(total, 2),
-        "streams": streams,
+        "amount": round(total_amount, 2),
+        "streams": total_streams if measured else streams,
         "breakdown": breakdown,
-        "at_risk": total > 0,
+        "at_risk": total_amount > 0,
+        "measured": bool(measured),
     }
+
+
+def _resolve_platform_streams(streams, priced, total_weight, measured):
+    """Return ({platform: count}, {platform: measured_bool}) for all platforms.
+
+    Uses real counts where measured; fills unmeasured platforms either from a
+    measured anchor (share ratio) or, with no measured data, from the modeled
+    split of the projected total.
+    """
+    per_platform, is_measured = {}, {}
+    if measured:
+        anchor = max(measured, key=lambda p: priced[p])
+        anchor_share = priced[anchor] or (1.0 / len(priced))
+        for platform in priced:
+            if platform in measured:
+                per_platform[platform] = measured[platform]
+                is_measured[platform] = True
+            else:
+                ratio = (priced[platform] / anchor_share) if anchor_share else 0.0
+                per_platform[platform] = int(round(measured[anchor] * ratio))
+                is_measured[platform] = False
+    else:
+        for platform in priced:
+            per_platform[platform] = int(round(streams * priced[platform] / total_weight))
+            is_measured[platform] = False
+    return per_platform, is_measured
 
 
 def format_usd(amount):

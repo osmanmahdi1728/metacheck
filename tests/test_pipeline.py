@@ -96,6 +96,29 @@ def test_enricher_skipped_for_bad_isrc():
     assert r["mb"] is None
 
 
+def test_streams_fetcher_uses_real_per_platform_counts():
+    def fake_fetcher(isrc):
+        return {"Spotify": 2_000_000, "Audiomack": 500_000}
+
+    (r,) = process_records([UNREGISTERED_NO_COMPOSER], streams_fetcher=fake_fetcher)
+    assert r["streams_measured"] is True
+    assert r["streams_projected"] is False
+    by_platform = {b["platform"]: b for b in r["royalty_breakdown"]}
+    assert by_platform["Spotify"]["streams"] == 2_000_000
+    assert by_platform["Spotify"]["measured"] is True
+    # Header total reflects the measured/derived sum, not the CSV projection.
+    assert r["streams"] == sum(b["streams"] for b in r["royalty_breakdown"])
+
+
+def test_streams_fetcher_none_falls_back_to_model():
+    def empty_fetcher(isrc):
+        return None
+
+    (r,) = process_records([UNREGISTERED_NO_COMPOSER], streams_fetcher=empty_fetcher)
+    assert r["streams_measured"] is False
+    assert r["streams"] == 210000  # the CSV/projected total, split by model
+
+
 def test_humanizer_is_applied_and_preserves_codes():
     def fake_humanizer(title, issues):
         return [{**i, "detail": "friendly: " + i["detail"]} for i in issues]

@@ -83,6 +83,29 @@ def test_overlapping_publishing_codes_do_not_double_count():
     assert only_composer == both
 
 
+def test_measured_platform_streams_are_priced_directly():
+    # Real Spotify + Audiomack counts; Apple has no data and is estimated.
+    measured = {"Spotify": 1_000_000, "Audiomack": 400_000}
+    risk = estimate_risk(["COMPOSER_MISSING"], 100000, platform_streams=measured)
+    assert risk["measured"] is True
+    by_platform = {b["platform"]: b for b in risk["breakdown"]}
+    assert by_platform["Spotify"]["streams"] == 1_000_000
+    assert by_platform["Spotify"]["measured"] is True
+    assert by_platform["Audiomack"]["streams"] == 400_000
+    assert by_platform["Audiomack"]["measured"] is True
+    # Apple Music is filled from the anchor (Spotify) via share ratio, flagged.
+    assert by_platform["Apple Music"]["measured"] is False
+    assert by_platform["Apple Music"]["streams"] > 0
+    # Reported total streams reflects the measured/derived per-platform sum.
+    assert risk["streams"] == sum(b["streams"] for b in risk["breakdown"])
+
+
+def test_no_risk_short_circuits_even_with_measured_streams():
+    risk = estimate_risk(["GENRE_MISSING"], 100000, platform_streams={"Spotify": 999})
+    assert risk["at_risk"] is False
+    assert risk["measured"] is False
+
+
 def test_format_usd_whole_vs_cents():
     assert format_usd(100) == "$100"
     assert format_usd(1700) == "$1,700"
