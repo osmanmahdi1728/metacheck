@@ -49,8 +49,12 @@ is registered for collection.
   as unconfirmed. (Demo uses a local mock registry; swap in real CMO APIs in
   `validator/cmo.py`.)
 - **Royalty-at-risk estimate** — connects a broken/missing field to the money
-  it costs, based on stream counts (real or projected) and blended per-stream
-  rates. This is the layer DistroKid / TuneCore / LANDR don't have.
+  it costs. The total stream count (real or projected) is split across platforms
+  by a modeled market-share distribution (Afro-market tilt by default) and priced
+  with per-platform per-stream mechanical rates, so each platform shows its own
+  stream slice and dollars. Override the split with real per-artist numbers via
+  `estimate_risk(shares=...)`. This is the layer DistroKid / TuneCore / LANDR
+  don't have.
 - **Plain-language rewrite** — optional GPT-4o-mini pass that turns error codes
   into artist-friendly guidance. Works without a key (falls back to built-in
   messages).

@@ -68,6 +68,7 @@
       border: 1px solid rgba(124, 58, 237, 0.3); padding: 3px 10px; border-radius: 20px;
     }
     .chip b { color: #fff; }
+    .chip-sub { color: #8b7bb0; font-size: 0.72rem; margin-left: 2px; }
     .cmo-line { font-size: 0.82rem; margin: 0 0 12px; }
     .cmo-line.ok { color: #86efac; }
     .cmo-line.bad { color: #fca5a5; }
@@ -111,10 +112,10 @@
     <div class="meta">{{ track.artist }} &nbsp;·&nbsp; ISRC: {{ track.isrc }} &nbsp;·&nbsp; {{ "{:,}".format(track.streams) }} streams{% if track.streams_projected %} (projected){% endif %} &nbsp;·&nbsp; {{ track.error_count }} error(s), {{ track.warning_count }} warning(s)</div>
 
     {% if track.royalty_at_risk > 0 %}
-    <div class="risk-banner">💸&nbsp; Estimated <strong>{{ track.royalty_at_risk_display }}</strong> in uncollected mechanical royalties on {{ "{:,}".format(track.streams) }} streams{% if track.streams_projected %} (projected){% endif %}.</div>
+    <div class="risk-banner">💸&nbsp; Estimated <strong>{{ track.royalty_at_risk_display }}</strong> in uncollected mechanical royalties on {{ "{:,}".format(track.streams) }} total streams{% if track.streams_projected %} (projected){% endif %}, split across platforms.</div>
     <div class="risk-breakdown">
       {% for line in track.royalty_breakdown %}
-      <span class="chip">{{ line.platform }}: <b>{{ line.amount_display }}</b></span>
+      <span class="chip">{{ line.platform }}: <b>{{ line.amount_display }}</b> <span class="chip-sub">{{ line.streams_display }} streams</span></span>
       {% endfor %}
     </div>
     {% endif %}
@@ -151,10 +152,13 @@
   {% endfor %}
 
   <p class="disclaimer">
-    Royalty-at-risk figures estimate uncollected <strong>mechanical</strong> royalties, using stream counts
-    (real or projected) and commonly-cited per-stream mechanical rates by platform (Spotify $0.000393,
-    Apple Music $0.000456, Audiomack $0.00012). They illustrate downstream impact, not guaranteed amounts.
-    CMO registration is checked against a demo registry; production would query SOCAN / ASCAP / MCSK directly.
+    Royalty-at-risk figures estimate uncollected <strong>mechanical</strong> royalties. The total stream count
+    (real or projected) is split across platforms by a modeled market-share distribution (Spotify 45% /
+    Apple Music 25% / Audiomack 30%, Afro-market tilt), then priced with commonly-cited per-stream mechanical
+    rates (Spotify $0.000393, Apple Music $0.000456, Audiomack $0.00012). No free/official API exposes real
+    per-platform play counts, so the split is a defensible model, not measured data — plug in real per-artist
+    numbers to refine it. Figures illustrate downstream impact, not guaranteed amounts. CMO registration is
+    checked against a demo registry; production would query SOCAN / ASCAP / MCSK directly.
   </p>
 </body>
 </html>

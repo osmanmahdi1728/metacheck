@@ -1,10 +1,23 @@
 from validator.royalty import (
     DEFAULT_PROJECTED_STREAMS,
     MECHANICAL_RATES,
+    PLATFORM_STREAM_SHARE,
     estimate_risk,
     format_usd,
     parse_streams,
 )
+
+
+def _expected_split_total(streams, shares=None):
+    """Mirror estimate_risk's split math so tests aren't brittle to rate changes."""
+    weights = shares or PLATFORM_STREAM_SHARE
+    priced = {p: weights.get(p, 0.0) for p in MECHANICAL_RATES}
+    total_weight = sum(priced.values()) or 1.0
+    total = 0.0
+    for platform, rate in MECHANICAL_RATES.items():
+        platform_streams = int(round(streams * priced[platform] / total_weight))
+        total += round(platform_streams * rate, 2)
+    return round(total, 2)
 
 
 def test_parse_real_streams():
@@ -41,8 +54,26 @@ def test_composer_missing_triggers_all_platforms():
     risk = estimate_risk(["COMPOSER_MISSING"], streams)
     assert risk["at_risk"] is True
     assert len(risk["breakdown"]) == len(MECHANICAL_RATES)
-    expected = round(sum(streams * r for r in MECHANICAL_RATES.values()), 2)
-    assert risk["amount"] == expected
+    assert risk["amount"] == _expected_split_total(streams)
+
+
+def test_streams_are_split_across_platforms_not_duplicated():
+    streams = 100000
+    risk = estimate_risk(["COMPOSER_MISSING"], streams)
+    # Per-platform slices should sum to (about) the total, not 3x it.
+    assert sum(line["streams"] for line in risk["breakdown"]) == streams
+    # Each platform reflects its own share, so slices differ.
+    slices = {line["platform"]: line["streams"] for line in risk["breakdown"]}
+    assert slices["Spotify"] > slices["Apple Music"]
+
+
+def test_shares_override_changes_distribution():
+    streams = 100000
+    even = {"Spotify": 1, "Apple Music": 1, "Audiomack": 1}
+    risk = estimate_risk(["COMPOSER_MISSING"], streams, shares=even)
+    slices = {line["platform"]: line["streams"] for line in risk["breakdown"]}
+    assert slices["Spotify"] == slices["Apple Music"] == slices["Audiomack"]
+    assert risk["amount"] == _expected_split_total(streams, shares=even)
 
 
 def test_overlapping_publishing_codes_do_not_double_count():

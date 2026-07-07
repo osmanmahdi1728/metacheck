@@ -1,4 +1,5 @@
 from validator.pipeline import process_records, summarize
+from validator.royalty import estimate_risk
 
 VALID_REGISTERED = {
     "title": "Midnight Savanna", "artist": "SAFARIZMA", "isrc": "QZ-ES1-26-00001",
@@ -32,7 +33,7 @@ def test_valid_registered_track_passes_with_no_risk():
 def test_composer_missing_has_mechanical_risk():
     (r,) = process_records([COMPOSER_MISSING_REGISTERED])
     assert r["status"] == "FAIL"
-    assert r["royalty_at_risk"] == 329.46
+    assert r["royalty_at_risk"] == estimate_risk(["COMPOSER_MISSING"], 340000)["amount"]
     assert len(r["royalty_breakdown"]) == 3
 
 
@@ -43,7 +44,7 @@ def test_unconfirmed_registration_is_not_a_false_negative():
     (r,) = process_records([UNREGISTERED_NO_COMPOSER])
     assert r["status"] == "FAIL"
     assert r["cmo"]["registered"] is None
-    assert r["royalty_at_risk"] == 203.49
+    assert r["royalty_at_risk"] == estimate_risk(["COMPOSER_MISSING", "PUBLISHER_MISSING"], 210000)["amount"]
 
 
 def test_iswc_from_enrichment_marks_work_registered():
@@ -64,7 +65,12 @@ def test_summary_totals():
     assert stats["total"] == 3
     assert stats["passed"] == 1
     assert stats["failed"] == 2
-    assert stats["total_royalty_at_risk"] == 532.95
+    expected = round(
+        estimate_risk(["COMPOSER_MISSING"], 340000)["amount"]
+        + estimate_risk(["COMPOSER_MISSING", "PUBLISHER_MISSING"], 210000)["amount"],
+        2,
+    )
+    assert stats["total_royalty_at_risk"] == expected
 
 
 def test_enricher_attaches_public_db_data():
@@ -97,4 +103,4 @@ def test_humanizer_is_applied_and_preserves_codes():
     (r,) = process_records([COMPOSER_MISSING_REGISTERED], humanizer=fake_humanizer)
     assert all(i["detail"].startswith("friendly: ") for i in r["issues"])
     # Codes preserved so royalty math still worked.
-    assert r["royalty_at_risk"] == 329.46
+    assert r["royalty_at_risk"] == estimate_risk(["COMPOSER_MISSING"], 340000)["amount"]
