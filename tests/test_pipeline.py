@@ -36,11 +36,26 @@ def test_composer_missing_has_mechanical_risk():
     assert len(r["royalty_breakdown"]) == 3
 
 
-def test_unregistered_isrc_flagged_and_priced():
+def test_unconfirmed_registration_is_not_a_false_negative():
+    # Not in the demo registry and no enrichment: we must NOT claim it's
+    # unregistered (that produced false negatives on real hits). Registration
+    # is "unknown" (None), while submission gaps still drive royalty risk.
     (r,) = process_records([UNREGISTERED_NO_COMPOSER])
     assert r["status"] == "FAIL"
-    assert r["cmo"]["registered"] is False
+    assert r["cmo"]["registered"] is None
     assert r["royalty_at_risk"] == 203.49
+
+
+def test_iswc_from_enrichment_marks_work_registered():
+    def enricher_with_iswc(isrc):
+        return {"found": True, "recording_title": "City Lights", "artists": "Unknown Artist",
+                "composers": ["Ada Obi"], "work_titles": ["City Lights"],
+                "iswcs": ["T-123.456.789-0"]}
+
+    (r,) = process_records([UNREGISTERED_NO_COMPOSER], enricher=enricher_with_iswc)
+    assert r["cmo"]["registered"] is True
+    assert r["cmo"]["iswc"] == "T-123.456.789-0"
+    assert r["cmo"]["source"] == "ISWC via MusicBrainz"
 
 
 def test_summary_totals():

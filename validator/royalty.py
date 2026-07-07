@@ -23,12 +23,14 @@ MECHANICAL_RATES = {
 DEFAULT_PROJECTED_STREAMS = 100_000
 
 # Issue codes that mean mechanical royalties can't be collected until fixed.
-# A missing composer (or unregistered/mismatched work) blocks CMO registration;
-# a missing publisher blocks the admin/collection relationship. To stop counting
-# publisher-only gaps against a track, remove "PUBLISHER_MISSING" below.
+# A missing composer (or a work registered to the wrong writer) blocks CMO
+# registration/matching; a missing publisher blocks the admin/collection
+# relationship. We deliberately do NOT include a generic "unregistered" code:
+# we can't prove a work is unregistered from public data, so risk is driven by
+# concrete gaps in the submission itself. To stop counting publisher-only gaps
+# against a track, remove "PUBLISHER_MISSING" below.
 MECHANICAL_RISK_CODES = {
     "COMPOSER_MISSING",
-    "CMO_UNREGISTERED",
     "CMO_COMPOSER_MISMATCH",
     "PUBLISHER_MISSING",
 }

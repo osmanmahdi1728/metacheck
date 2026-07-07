@@ -54,7 +54,7 @@ def enrich_by_isrc(isrc):
     Always returns a dict; `found` is False on any miss or error (never raises
     into the caller, so enrichment can't break validation).
     """
-    empty = {"found": False, "recording_title": None, "artists": None, "composers": [], "work_titles": []}
+    empty = {"found": False, "recording_title": None, "artists": None, "composers": [], "work_titles": [], "iswcs": []}
     clean = (isrc or "").strip().upper()
     if not clean:
         return empty
@@ -65,7 +65,7 @@ def enrich_by_isrc(isrc):
         if recording is None:
             return empty
 
-        composers, work_titles = [], []
+        composers, work_titles, iswcs = [], [], []
         time.sleep(RATE_DELAY)
         rec_payload = _get(f"recording/{recording['id']}", {"inc": "work-rels"})
         for work_id in _work_ids(rec_payload):
@@ -76,6 +76,9 @@ def enrich_by_isrc(isrc):
             for name in _composers_from_work(work_payload):
                 if name not in composers:
                     composers.append(name)
+            for iswc in _iswcs_from_work(work_payload):
+                if iswc not in iswcs:
+                    iswcs.append(iswc)
 
         return {
             "found": True,
@@ -83,6 +86,7 @@ def enrich_by_isrc(isrc):
             "artists": recording["artists"],
             "composers": composers,
             "work_titles": work_titles,
+            "iswcs": iswcs,
         }
     except MusicBrainzError:
         return {**empty, "error": "MusicBrainz lookup failed"}
@@ -128,3 +132,12 @@ def _composers_from_work(work_payload):
             if name:
                 names.append(name)
     return names
+
+
+def _iswcs_from_work(work_payload):
+    """Return ISWC codes on a work. An ISWC is the international work identifier
+    assigned when a composition is registered with a CMO/CISAC — so its presence
+    is real evidence the work is registered for royalty collection."""
+    if not work_payload:
+        return []
+    return [code for code in work_payload.get("iswcs", []) if code]

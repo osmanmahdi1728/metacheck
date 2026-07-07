@@ -21,6 +21,7 @@ RECORDING_PAYLOAD = {
 
 WORK_PAYLOAD = {
     "title": "Essence",
+    "iswcs": ["T-303.010.722-9"],
     "relations": [
         {"type": "composer", "artist": {"name": "Wizkid"}},
         {"type": "lyricist", "artist": {"name": "Tems"}},
@@ -55,6 +56,15 @@ def test_composers_from_work_filters_writer_roles():
     assert "Tems" in names
     # A publishing relation is not a writer credit.
     assert "Some Publisher" not in names
+
+
+def test_iswcs_from_work_extracts_codes():
+    assert mb._iswcs_from_work(WORK_PAYLOAD) == ["T-303.010.722-9"]
+
+
+def test_iswcs_from_work_empty_when_missing():
+    assert mb._iswcs_from_work({"title": "No Code"}) == []
+    assert mb._iswcs_from_work(None) == []
 
 
 def test_enrich_by_isrc_blank_returns_not_found():

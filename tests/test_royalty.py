@@ -48,7 +48,7 @@ def test_composer_missing_triggers_all_platforms():
 def test_overlapping_publishing_codes_do_not_double_count():
     streams = 210000
     only_composer = estimate_risk(["COMPOSER_MISSING"], streams)["amount"]
-    both = estimate_risk(["COMPOSER_MISSING", "CMO_UNREGISTERED"], streams)["amount"]
+    both = estimate_risk(["COMPOSER_MISSING", "PUBLISHER_MISSING"], streams)["amount"]
     assert only_composer == both
 
 

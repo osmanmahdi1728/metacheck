@@ -54,31 +54,41 @@ def process_records(records, humanizer=None, enricher=None):
 
         isrc = _clean(track.get("isrc"), "")
         composer = _clean(track.get("composer"), "")
-
-        # CMO registration cross-check — only meaningful for a well-formed ISRC.
-        cmo_info = {"registered": None, "cmo": None, "registered_composer": None}
         have_isrc_issue = any(i["code"] in ISRC_VALID_CODES_TO_SKIP_CMO for i in errors)
-        if isrc and not have_isrc_issue:
-            cmo_info = check_registration(isrc)
-            if not cmo_info["registered"]:
-                warnings.append({
-                    "field": "isrc",
-                    "code": "CMO_UNREGISTERED",
-                    "detail": "This ISRC isn't registered at any CMO (SOCAN, ASCAP, MCSK, etc.) in our records. Performance and mechanical royalties can't be collected until the work is registered.",
-                })
-            elif composer and cmo_info["registered_composer"] and composer.lower() != cmo_info["registered_composer"].lower():
-                warnings.append({
-                    "field": "composer",
-                    "code": "CMO_COMPOSER_MISMATCH",
-                    "detail": f"The composer '{composer}' doesn't match the name on file at {cmo_info['cmo']} ('{cmo_info['registered_composer']}'). This can cause royalty splits to pay the wrong party.",
-                })
 
-        # Optional real-data enrichment (MusicBrainz) — only with a usable ISRC.
-        # Attached as its own field and shown as a distinct callout in the
-        # report, rather than mixed into the issue list.
+        # Real-data enrichment (MusicBrainz) — only with a usable ISRC. Attached
+        # as its own field and shown as a distinct callout in the report.
         mb = None
         if enricher is not None and isrc and not have_isrc_issue:
             mb = enricher(normalize_isrc(isrc))
+
+        # Registration status. We only make a POSITIVE claim when we have real
+        # evidence: a hit in the (demo) CMO registry, or an ISWC from
+        # MusicBrainz (the international work code assigned at CMO registration).
+        # We never assert "not registered" — absence of evidence isn't proof,
+        # and false negatives on real tracks destroy credibility.
+        cmo_info = {"registered": None, "cmo": None, "registered_composer": None, "iswc": None, "source": None}
+        if isrc and not have_isrc_issue:
+            registry = check_registration(isrc)
+            if registry["registered"]:
+                cmo_info.update({
+                    "registered": True,
+                    "cmo": registry["cmo"],
+                    "registered_composer": registry["registered_composer"],
+                    "source": registry["cmo"],
+                })
+                if composer and registry["registered_composer"] and composer.lower() != registry["registered_composer"].lower():
+                    warnings.append({
+                        "field": "composer",
+                        "code": "CMO_COMPOSER_MISMATCH",
+                        "detail": f"The composer '{composer}' doesn't match the name on file at {registry['cmo']} ('{registry['registered_composer']}'). This can cause royalty splits to pay the wrong party.",
+                    })
+            elif mb and mb.get("iswcs"):
+                cmo_info.update({
+                    "registered": True,
+                    "iswc": mb["iswcs"][0],
+                    "source": "ISWC via MusicBrainz",
+                })
 
         all_issues = errors + warnings
 

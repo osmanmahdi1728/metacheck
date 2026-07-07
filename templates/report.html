@@ -71,6 +71,8 @@
     .cmo-line { font-size: 0.82rem; margin: 0 0 12px; }
     .cmo-line.ok { color: #86efac; }
     .cmo-line.bad { color: #fca5a5; }
+    .cmo-line.unknown { color: #94a3b8; }
+    .src-inline { color: #64748b; font-style: italic; }
     .mb-callout {
       background: rgba(29, 185, 84, 0.1); border: 1px solid rgba(29, 185, 84, 0.4);
       border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; font-size: 0.86rem; color: #b9f6ca; line-height: 1.5;
@@ -125,12 +127,14 @@
     </div>
     {% endif %}
 
-    {% if track.cmo.registered is not none %}
-      {% if track.cmo.registered %}
-      <p class="cmo-line ok">✓ Registered at {{ track.cmo.cmo }} for royalty collection.</p>
+    {% if track.cmo.registered %}
+      {% if track.cmo.iswc %}
+      <p class="cmo-line ok">✓ Composition is registered — ISWC {{ track.cmo.iswc }} on file. <span class="src-inline">Source: {{ track.cmo.source }}</span></p>
       {% else %}
-      <p class="cmo-line bad">✗ Not found in any CMO registry (SOCAN / ASCAP / MCSK).</p>
+      <p class="cmo-line ok">✓ Registered at {{ track.cmo.cmo }} for royalty collection.</p>
       {% endif %}
+    {% elif track.isrc != 'N/A' %}
+      <p class="cmo-line unknown">◦ CMO registration couldn't be confirmed from public data (no registry hit and no ISWC found). This isn't proof it's unregistered — verify directly with your CMO.</p>
     {% endif %}
 
     {% if track.issues %}

@@ -32,16 +32,22 @@ against **MusicBrainz** (the open music database, no API key needed) to pull
 the real composer/work data. This powers the strongest insight: Spotify gives
 the ISRC, MusicBrainz knows the composers — but if the distribution submission
 left the composer blank, no CMO can match the royalties. The report shows a
-callout naming the composers found in public databases.
+callout naming the composers found in public databases. MetaCheck also reads
+the work's **ISWC** (the international work code assigned at CMO/CISAC
+registration) from MusicBrainz — its presence is real evidence the composition
+is registered for collection.
 
 ## What it checks
 
 - **Metadata rules** — ISRC format, contributor completeness, genre, explicit
   and AI flags, release-date lead time, language codes.
-- **CMO registration** — cross-references the ISRC against collective royalty
-  databases (SOCAN / ASCAP / MCSK / …) to confirm the work is actually
-  registered for collection, not just that the field is filled. (Demo uses a
-  local mock registry; swap in real APIs in `validator/cmo.py`.)
+- **CMO registration** — confirms a work is actually registered for collection,
+  not just that the field is filled. MetaCheck only makes a *positive* claim
+  when it has real evidence: a hit in the CMO registry, or an ISWC from
+  MusicBrainz. It never asserts "not registered" from absence of evidence
+  (that produced false negatives on real hits) — instead it reports registration
+  as unconfirmed. (Demo uses a local mock registry; swap in real CMO APIs in
+  `validator/cmo.py`.)
 - **Royalty-at-risk estimate** — connects a broken/missing field to the money
   it costs, based on stream counts (real or projected) and blended per-stream
   rates. This is the layer DistroKid / TuneCore / LANDR don't have.
