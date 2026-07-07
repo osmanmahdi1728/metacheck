@@ -77,9 +77,12 @@ def test_missing_publisher_is_warning_not_fail():
     assert "PUBLISHER_MISSING" in codes(result)
 
 
-def test_release_date_in_past():
+def test_release_date_in_past_is_allowed():
+    # MetaCheck validates already-released catalog too, so a past date is fine.
     row = {**BASE_VALID, "release_date": "2000-01-01"}
-    assert "RELEASE_DATE_PAST" in codes(validate_track(row))
+    result = validate_track(row)
+    assert "RELEASE_DATE_PAST" not in codes(result)
+    assert result["status"] == "PASS"
 
 
 def test_release_date_bad_format():

@@ -125,6 +125,9 @@ def process_records(records, humanizer=None, enricher=None, streams_fetcher=None
             "royalty_at_risk_display": format_usd(risk["amount"]),
             "royalty_breakdown": risk["breakdown"],
             "mb": mb,
+            # Original submitted values, so the report can offer an inline
+            # "correct & re-validate" form pre-filled with what was submitted.
+            "input": {col: _clean(track.get(col), "") for col in EXPECTED_COLUMNS + OPTIONAL_COLUMNS},
         })
     return results
 

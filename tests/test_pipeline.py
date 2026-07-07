@@ -96,6 +96,14 @@ def test_enricher_skipped_for_bad_isrc():
     assert r["mb"] is None
 
 
+def test_input_fields_carried_for_correction_form():
+    (r,) = process_records([COMPOSER_MISSING_REGISTERED])
+    assert r["input"]["title"] == "Lost In Lagos"
+    assert r["input"]["composer"] == ""  # the gap the user needs to correct
+    assert r["input"]["genre"] == "Afrobeats"
+    assert r["input"]["streams"] == "340000"
+
+
 def test_streams_fetcher_uses_real_per_platform_counts():
     def fake_fetcher(isrc):
         return {"Spotify": 2_000_000, "Audiomack": 500_000}

@@ -26,6 +26,21 @@ RATE_DELAY = 1.1
 # Relationship types on a work that credit the songwriter side.
 WRITER_RELATION_TYPES = {"composer", "writer", "lyricist", "songwriter"}
 
+# Recording-level relationship types -> friendly role label. These answer
+# "who's actually on the song" (producer, vocalists, mixers, etc.) — data that
+# also belongs on a distribution submission but is often left off.
+RECORDING_ROLE_LABELS = {
+    "producer": "Producer",
+    "vocal": "Vocals",
+    "performer": "Performer",
+    "instrument": "Instrument",
+    "mix": "Mix",
+    "recording": "Recording",
+    "engineer": "Engineer",
+    "mastering": "Mastering",
+    "remixer": "Remixer",
+}
+
 
 class MusicBrainzError(Exception):
     """Raised on a MusicBrainz request failure."""
@@ -54,7 +69,7 @@ def enrich_by_isrc(isrc):
     Always returns a dict; `found` is False on any miss or error (never raises
     into the caller, so enrichment can't break validation).
     """
-    empty = {"found": False, "recording_title": None, "artists": None, "composers": [], "work_titles": [], "iswcs": []}
+    empty = {"found": False, "recording_title": None, "artists": None, "composers": [], "work_titles": [], "iswcs": [], "contributors": []}
     clean = (isrc or "").strip().upper()
     if not clean:
         return empty
@@ -67,7 +82,9 @@ def enrich_by_isrc(isrc):
 
         composers, work_titles, iswcs = [], [], []
         time.sleep(RATE_DELAY)
-        rec_payload = _get(f"recording/{recording['id']}", {"inc": "work-rels"})
+        # Pull both the linked work(s) and the recording-level personnel in one call.
+        rec_payload = _get(f"recording/{recording['id']}", {"inc": "work-rels artist-rels"})
+        contributors = _contributors_from_recording(rec_payload)
         for work_id in _work_ids(rec_payload):
             time.sleep(RATE_DELAY)
             work_payload = _get(f"work/{work_id}", {"inc": "artist-rels"})
@@ -87,6 +104,7 @@ def enrich_by_isrc(isrc):
             "composers": composers,
             "work_titles": work_titles,
             "iswcs": iswcs,
+            "contributors": contributors,
         }
     except MusicBrainzError:
         return {**empty, "error": "MusicBrainz lookup failed"}
@@ -132,6 +150,32 @@ def _composers_from_work(work_payload):
             if name:
                 names.append(name)
     return names
+
+
+def _contributors_from_recording(recording_payload):
+    """Return [{name, role}] of the people on the recording — producers,
+    vocalists, mixers, engineers, etc. Roles are de-duplicated per person, and
+    a relationship attribute (e.g. 'co') is folded into the label."""
+    if not recording_payload:
+        return []
+    seen = {}
+    order = []
+    for rel in recording_payload.get("relations", []):
+        artist = rel.get("artist") or {}
+        name = artist.get("name")
+        rel_type = (rel.get("type") or "").lower()
+        if not name or rel_type not in RECORDING_ROLE_LABELS:
+            continue
+        label = RECORDING_ROLE_LABELS[rel_type]
+        attrs = [a for a in (rel.get("attributes") or []) if a]
+        if "co" in [a.lower() for a in attrs]:
+            label = f"Co-{label.lower()}"
+        if name not in seen:
+            seen[name] = []
+            order.append(name)
+        if label not in seen[name]:
+            seen[name].append(label)
+    return [{"name": name, "role": ", ".join(seen[name])} for name in order]
 
 
 def _iswcs_from_work(work_payload):

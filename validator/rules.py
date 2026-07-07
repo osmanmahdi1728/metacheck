@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, date
+from datetime import datetime
 
 # An ISRC is 12 chars: 2-letter country + 3 alphanumeric registrant + 2-digit
 # year + 5-digit designation. It's valid with or without hyphen separators
@@ -36,7 +36,6 @@ ERROR_CODES = {
     "COMPOSER_MISSING",
     "GENRE_MISSING",
     "RELEASE_DATE_MISSING",
-    "RELEASE_DATE_PAST",
     "RELEASE_DATE_FORMAT",
     "EXPLICIT_FLAG_MISSING",
     "AI_FLAG_MISSING",
@@ -84,16 +83,15 @@ def validate_track(row):
     elif genre not in VALID_GENRES:
         warnings.append({"field": "genre", "code": "GENRE_NOT_STANDARD", "detail": f"'{genre}' is not in the standard DSP genre list. This may cause miscategorization on Spotify and Apple Music."})
 
-    # Release date
+    # Release date. We only require a well-formed date — a date in the past is
+    # fine (MetaCheck is used on already-released catalog too, not just
+    # pre-release), so we don't flag past dates.
     release_date_str = str(row.get("release_date", "")).strip()
     if not release_date_str or release_date_str.lower() == "nan":
         errors.append({"field": "release_date", "code": "RELEASE_DATE_MISSING", "detail": "Release date is missing."})
     else:
         try:
-            release_date = datetime.strptime(release_date_str, "%Y-%m-%d").date()
-            today = date.today()
-            if release_date <= today:
-                errors.append({"field": "release_date", "code": "RELEASE_DATE_PAST", "detail": f"Release date {release_date_str} is in the past or today. Most DSPs require at least 2 business days lead time."})
+            datetime.strptime(release_date_str, "%Y-%m-%d").date()
         except ValueError:
             errors.append({"field": "release_date", "code": "RELEASE_DATE_FORMAT", "detail": f"Release date '{release_date_str}' is not in YYYY-MM-DD format."})
 

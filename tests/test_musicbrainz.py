@@ -58,6 +58,37 @@ def test_composers_from_work_filters_writer_roles():
     assert "Some Publisher" not in names
 
 
+RECORDING_WITH_PEOPLE = {
+    "id": "rec-123",
+    "relations": [
+        {"type": "producer", "artist": {"name": "Richard P2J Isong"}, "attributes": []},
+        {"type": "producer", "artist": {"name": "Tems"}, "attributes": ["co"]},
+        {"type": "vocal", "artist": {"name": "Tems"}, "attributes": []},
+        {"type": "vocal", "artist": {"name": "Wizkid"}, "attributes": []},
+        {"type": "engineer", "artist": {"name": "Sam Harper"}, "attributes": []},
+        {"target-type": "work", "work": {"id": "work-abc"}},
+    ],
+}
+
+
+def test_contributors_extract_roles_and_dedupe():
+    people = mb._contributors_from_recording(RECORDING_WITH_PEOPLE)
+    by_name = {p["name"]: p["role"] for p in people}
+    assert by_name["Richard P2J Isong"] == "Producer"
+    assert by_name["Wizkid"] == "Vocals"
+    assert by_name["Sam Harper"] == "Engineer"
+    # Tems is both co-producer and vocalist; roles fold into one entry.
+    assert "Co-producer" in by_name["Tems"]
+    assert "Vocals" in by_name["Tems"]
+    # Each person appears once.
+    assert len(people) == 4
+
+
+def test_contributors_empty_when_no_relations():
+    assert mb._contributors_from_recording(None) == []
+    assert mb._contributors_from_recording({"relations": []}) == []
+
+
 def test_iswcs_from_work_extracts_codes():
     assert mb._iswcs_from_work(WORK_PAYLOAD) == ["T-303.010.722-9"]
 

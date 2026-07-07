@@ -83,6 +83,42 @@
     }
     .mb-callout b { color: #fff; }
     .mb-callout .src { color: var(--muted); font-size: 0.75rem; }
+    .people {
+      background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+    }
+    .people-title { font-size: 0.82rem; font-weight: 700; color: #bae6fd; margin-bottom: 8px; }
+    .people-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .person {
+      display: inline-flex; flex-direction: column; background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; padding: 5px 10px;
+    }
+    .person b { color: #fff; font-size: 0.84rem; }
+    .person .role { color: #7dd3fc; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .people .src { color: var(--muted); font-size: 0.75rem; margin-top: 8px; }
+    .fixbox { margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.02); }
+    .fixbox summary { cursor: pointer; padding: 10px 14px; font-size: 0.85rem; font-weight: 600; color: #c4b5fd; list-style: none; }
+    .fixbox summary::-webkit-details-marker { display: none; }
+    .fixbox summary:hover { color: #ddd0ff; }
+    .fixbox[open] summary { border-bottom: 1px solid var(--border); }
+    .fixform { padding: 14px; }
+    .fixform .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 560px) { .fixform .fgrid { grid-template-columns: 1fr; } }
+    .fixform .fld { display: flex; flex-direction: column; gap: 4px; }
+    .fixform .fld.full { grid-column: 1 / -1; }
+    .fixform label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+    .fixform input, .fixform select {
+      background: #141019; border: 1px solid var(--border); color: var(--text);
+      padding: 8px 10px; border-radius: 6px; font-size: 0.85rem; width: 100%;
+    }
+    .fixform input:focus, .fixform select:focus { outline: none; border-color: var(--accent); }
+    .fixform .prefill { border-color: rgba(56, 189, 248, 0.5); }
+    .fixform button {
+      margin-top: 14px; background: var(--accent); color: #fff; border: none; padding: 11px 18px;
+      border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    }
+    .fixform button:hover { background: #8b4ff5; }
+    .fixform .hint { font-size: 0.75rem; color: var(--muted); margin: 0 0 10px; }
     .disclaimer { color: var(--muted); font-size: 0.78rem; margin-top: 30px; line-height: 1.5; }
 
     /* Interactive royalty "what-if" tool */
@@ -146,7 +182,7 @@
   {% set error_codes = [
     "TITLE_MISSING", "TITLE_TOO_LONG", "ARTIST_MISSING", "ISRC_MISSING",
     "ISRC_INVALID_FORMAT", "COMPOSER_MISSING", "GENRE_MISSING",
-    "RELEASE_DATE_MISSING", "RELEASE_DATE_PAST", "RELEASE_DATE_FORMAT",
+    "RELEASE_DATE_MISSING", "RELEASE_DATE_FORMAT",
     "EXPLICIT_FLAG_MISSING", "AI_FLAG_MISSING"
   ] %}
 
@@ -216,6 +252,18 @@
     </div>
     {% endif %}
 
+    {% if track.mb and track.mb.contributors %}
+    <div class="people">
+      <div class="people-title">🎧 Who's on this track (public credits)</div>
+      <div class="people-list">
+        {% for c in track.mb.contributors %}
+        <span class="person"><b>{{ c.name }}</b><span class="role">{{ c.role }}</span></span>
+        {% endfor %}
+      </div>
+      <div class="src">Source: MusicBrainz, matched by ISRC — add the relevant credits (esp. producer &amp; writers) to your distribution submission.</div>
+    </div>
+    {% endif %}
+
     {% if track.cmo.registered %}
       {% if track.cmo.iswc %}
       <p class="cmo-line ok">✓ Composition is registered — ISWC {{ track.cmo.iswc }} on file. <span class="src-inline">Source: {{ track.cmo.source }}</span></p>
@@ -235,6 +283,47 @@
       {% endfor %}
     {% else %}
       <p class="all-good">✓ All metadata fields are valid and ready for distribution.</p>
+    {% endif %}
+
+    {% if track.input %}
+    {% set mb_composers = (track.mb.composers | join(', ')) if (track.mb and track.mb.composers) else '' %}
+    <details class="fixbox"{% if track.status == 'FAIL' %} open{% endif %}>
+      <summary>✎ Correct these fields &amp; re-validate</summary>
+      <form action="/validate-manual" method="POST" class="fixform">
+        <p class="hint">Fill in the flagged fields and re-run. Fields pre-filled from public data (MusicBrainz) are outlined in blue — check them before submitting.</p>
+        <div class="fgrid">
+          <div class="fld full"><label>Title</label><input name="title" value="{{ track.input.title }}"></div>
+          <div class="fld full"><label>Artist</label><input name="artist" value="{{ track.input.artist }}"></div>
+          <div class="fld"><label>ISRC</label><input name="isrc" value="{{ track.input.isrc }}"></div>
+          <div class="fld"><label>Streams (optional)</label><input name="streams" value="{{ track.input.streams }}"></div>
+          <div class="fld"><label>Composer / Songwriter</label><input name="composer" value="{{ track.input.composer or mb_composers }}"{% if not track.input.composer and mb_composers %} class="prefill"{% endif %}></div>
+          <div class="fld"><label>Publisher</label><input name="publisher" value="{{ track.input.publisher }}"></div>
+          <div class="fld"><label>Genre</label><input name="genre" value="{{ track.input.genre }}" placeholder="Afro House"></div>
+          <div class="fld"><label>Release date</label><input name="release_date" value="{{ track.input.release_date }}" placeholder="YYYY-MM-DD"></div>
+          <div class="fld"><label>Explicit</label>
+            <select name="explicit">
+              <option value="" {{ 'selected' if not track.input.explicit }}>—</option>
+              <option value="false" {{ 'selected' if track.input.explicit == 'false' }}>false</option>
+              <option value="true" {{ 'selected' if track.input.explicit == 'true' }}>true</option>
+            </select>
+          </div>
+          <div class="fld"><label>AI generated</label>
+            <select name="ai_generated">
+              <option value="" {{ 'selected' if not track.input.ai_generated }}>—</option>
+              <option value="false" {{ 'selected' if track.input.ai_generated == 'false' }}>false</option>
+              <option value="true" {{ 'selected' if track.input.ai_generated == 'true' }}>true</option>
+            </select>
+          </div>
+          <div class="fld full"><label>Language (ISO 639-1)</label><input name="language" value="{{ track.input.language }}" placeholder="en"></div>
+        </div>
+        {% if ai_available %}
+        <label class="hint" style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+          <input type="checkbox" name="plain_language" checked style="width:15px;height:15px;accent-color:var(--accent);"> Rewrite errors in plain language (GPT-4o-mini)
+        </label>
+        {% endif %}
+        <button type="submit">Re-validate ↻</button>
+      </form>
+    </details>
     {% endif %}
   </div>
   {% endfor %}
