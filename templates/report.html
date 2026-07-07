@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MetaCheck Report</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --card: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #f5f5f5;
+      --muted: #9a9a9a;
+      --accent: #7c3aed;
+      --pass: #38a169;
+      --fail: #e53e3e;
+      --warn: #d97706;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 48px 20px 80px;
+    }
+    .top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    h1 { font-size: 1.7rem; margin: 0; letter-spacing: -0.02em; }
+    h1 .dot { color: var(--accent); }
+    .tagline { color: var(--muted); margin: 6px 0 0; font-size: 0.95rem; }
+    .back { color: var(--accent); text-decoration: none; font-size: 0.9rem; font-weight: 600; }
+    .back:hover { text-decoration: underline; }
+    .summary { display: flex; gap: 16px; margin: 28px 0; flex-wrap: wrap; }
+    .stat {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 18px 26px; border-radius: 12px; text-align: center; flex: 1; min-width: 120px;
+    }
+    .stat span { display: block; font-size: 2.1rem; font-weight: 700; line-height: 1.1; }
+    .stat label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .track {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 22px; margin-bottom: 16px;
+    }
+    .track.fail { border-left: 4px solid var(--fail); }
+    .track.pass { border-left: 4px solid var(--pass); }
+    .track h2 { margin: 0 0 6px; font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
+    .track .meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 14px; }
+    .badge { display: inline-block; padding: 3px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; }
+    .badge.fail { background: rgba(229, 62, 62, 0.18); color: #fca5a5; }
+    .badge.pass { background: rgba(56, 161, 105, 0.18); color: #86efac; }
+    .issue { padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; font-size: 0.9rem; line-height: 1.45; }
+    .issue.error { background: rgba(229, 62, 62, 0.1); border-left: 3px solid var(--fail); }
+    .issue.warning { background: rgba(217, 119, 6, 0.1); border-left: 3px solid var(--warn); }
+    .field-tag { font-weight: 700; text-transform: uppercase; font-size: 0.7rem; color: var(--muted); margin-bottom: 3px; letter-spacing: 0.05em; }
+    .all-good { color: #86efac; font-size: 0.9rem; margin: 4px 0 0; }
+    .stat.risk { border-color: rgba(124, 58, 237, 0.5); background: rgba(124, 58, 237, 0.12); }
+    .stat.risk span { color: #c4b5fd; }
+    .risk-banner {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(124, 58, 237, 0.12); border: 1px solid rgba(124, 58, 237, 0.4);
+      color: #d6c6ff; padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 12px;
+    }
+    .risk-banner strong { color: #fff; font-size: 1.05rem; }
+    .risk-breakdown { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 12px; }
+    .chip {
+      font-size: 0.78rem; color: #d6c6ff; background: rgba(124, 58, 237, 0.1);
+      border: 1px solid rgba(124, 58, 237, 0.3); padding: 3px 10px; border-radius: 20px;
+    }
+    .chip b { color: #fff; }
+    .cmo-line { font-size: 0.82rem; margin: 0 0 12px; }
+    .cmo-line.ok { color: #86efac; }
+    .cmo-line.bad { color: #fca5a5; }
+    .disclaimer { color: var(--muted); font-size: 0.78rem; margin-top: 30px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  {% set error_codes = [
+    "TITLE_MISSING", "TITLE_TOO_LONG", "ARTIST_MISSING", "ISRC_MISSING",
+    "ISRC_INVALID_FORMAT", "COMPOSER_MISSING", "GENRE_MISSING",
+    "RELEASE_DATE_MISSING", "RELEASE_DATE_PAST", "RELEASE_DATE_FORMAT",
+    "EXPLICIT_FLAG_MISSING", "AI_FLAG_MISSING"
+  ] %}
+
+  <div class="top">
+    <div>
+      <h1>MetaCheck<span class="dot">.</span> Report</h1>
+      <p class="tagline">Pre-release metadata validation for DSP ingestion</p>
+    </div>
+    <a class="back" href="/">← Validate another file</a>
+  </div>
+
+  <div class="summary">
+    <div class="stat"><span>{{ total }}</span><label>Tracks Scanned</label></div>
+    <div class="stat"><span style="color: var(--pass)">{{ passed }}</span><label>Passed</label></div>
+    <div class="stat"><span style="color: var(--fail)">{{ failed }}</span><label>Failed</label></div>
+    <div class="stat risk"><span>{{ total_royalty_at_risk_display }}</span><label>Royalties at Risk</label></div>
+  </div>
+
+  {% for track in results %}
+  <div class="track {{ track.status | lower }}">
+    <h2>{{ track.title }} <span class="badge {{ track.status | lower }}">{{ track.status }}</span></h2>
+    <div class="meta">{{ track.artist }} &nbsp;·&nbsp; ISRC: {{ track.isrc }} &nbsp;·&nbsp; {{ "{:,}".format(track.streams) }} streams{% if track.streams_projected %} (projected){% endif %} &nbsp;·&nbsp; {{ track.error_count }} error(s), {{ track.warning_count }} warning(s)</div>
+
+    {% if track.royalty_at_risk > 0 %}
+    <div class="risk-banner">💸&nbsp; Estimated <strong>{{ track.royalty_at_risk_display }}</strong> in uncollected mechanical royalties on {{ "{:,}".format(track.streams) }} streams{% if track.streams_projected %} (projected){% endif %}.</div>
+    <div class="risk-breakdown">
+      {% for line in track.royalty_breakdown %}
+      <span class="chip">{{ line.platform }}: <b>{{ line.amount_display }}</b></span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if track.cmo.registered is not none %}
+      {% if track.cmo.registered %}
+      <p class="cmo-line ok">✓ Registered at {{ track.cmo.cmo }} for royalty collection.</p>
+      {% else %}
+      <p class="cmo-line bad">✗ Not found in any CMO registry (SOCAN / ASCAP / MCSK).</p>
+      {% endif %}
+    {% endif %}
+
+    {% if track.issues %}
+      {% for issue in track.issues %}
+      <div class="issue {{ 'error' if issue.code in error_codes else 'warning' }}">
+        <div class="field-tag">{{ issue.field }}</div>
+        {{ issue.detail }}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="all-good">✓ All metadata fields are valid and ready for distribution.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <p class="disclaimer">
+    Royalty-at-risk figures estimate uncollected <strong>mechanical</strong> royalties, using stream counts
+    (real or projected) and commonly-cited per-stream mechanical rates by platform (Spotify $0.000393,
+    Apple Music $0.000456, Audiomack $0.00012). They illustrate downstream impact, not guaranteed amounts.
+    CMO registration is checked against a demo registry; production would query SOCAN / ASCAP / MCSK directly.
+  </p>
+</body>
+</html>

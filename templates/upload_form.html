@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MetaCheck — Pre-release Metadata Validator</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --card: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #ffffff;
+      --muted: #9a9a9a;
+      --accent: #7c3aed;
+      --accent-hover: #8b4ff5;
+      --danger: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 44px 40px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .logo {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .logo .dot { color: var(--accent); }
+    h1 {
+      font-size: 1.35rem;
+      margin: 20px 0 8px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .subline {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin: 0 0 28px;
+    }
+    .error-banner {
+      background: rgba(248, 113, 113, 0.12);
+      border: 1px solid rgba(248, 113, 113, 0.4);
+      color: var(--danger);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+    .drop {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 28px 20px;
+      text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    .drop:hover { border-color: var(--accent); background: rgba(124, 58, 237, 0.06); }
+    .drop input { display: none; }
+    .drop .icon { font-size: 1.8rem; }
+    .drop .hint { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+    .file-name { color: var(--accent); font-size: 0.9rem; margin-top: 10px; min-height: 1.1em; }
+    .toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 0.88rem; color: var(--muted); }
+    .toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+    button {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--accent-hover); }
+    .footer { color: var(--muted); font-size: 0.8rem; text-align: center; margin-top: 22px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">MetaCheck<span class="dot">.</span></div>
+    <h1>Pre-release Metadata Validator</h1>
+    <p class="subline">Upload your track metadata CSV to check for DSP errors before you distribute.</p>
+
+    {% if error %}
+    <div class="error-banner">{{ error }}</div>
+    {% endif %}
+
+    <form action="/validate" method="POST" enctype="multipart/form-data">
+      <label class="drop" for="file-input">
+        <div class="icon">🎵</div>
+        <div><strong>Choose a CSV file</strong></div>
+        <div class="hint">or drag it here · .csv only</div>
+        <div class="file-name" id="file-name"></div>
+        <input id="file-input" type="file" name="file" accept=".csv" required />
+      </label>
+      {% if ai_available %}
+      <label class="toggle">
+        <input type="checkbox" name="plain_language" checked />
+        Rewrite errors in plain language (GPT-4o-mini)
+      </label>
+      {% endif %}
+      <button type="submit">Run Validation</button>
+    </form>
+
+    <div class="footer">Checks ISRC · CMO registration · royalty impact · DSP rules<br />Files are processed in memory, never stored.</div>
+  </div>
+
+  <script>
+    const input = document.getElementById("file-input");
+    const label = document.querySelector(".drop");
+    const nameEl = document.getElementById("file-name");
+
+    input.addEventListener("change", () => {
+      nameEl.textContent = input.files.length ? input.files[0].name : "";
+    });
+
+    ["dragover", "dragenter"].forEach(evt =>
+      label.addEventListener(evt, e => {
+        e.preventDefault();
+        label.style.borderColor = "var(--accent)";
+      })
+    );
+    ["dragleave", "drop"].forEach(evt =>
+      label.addEventListener(evt, e => {
+        e.preventDefault();
+        label.style.borderColor = "";
+      })
+    );
+    label.addEventListener("drop", e => {
+      if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        nameEl.textContent = input.files[0].name;
+      }
+    });
+  </script>
+</body>
+</html>
