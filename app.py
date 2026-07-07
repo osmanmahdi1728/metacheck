@@ -27,7 +27,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
 
-from validator import spotify
+from validator import musicbrainz, spotify
 from validator.humanize import humanize_errors, is_available
 from validator.pipeline import EXPECTED_COLUMNS, process_dataframe, process_records, summarize
 
@@ -96,7 +96,7 @@ def validate_manual():
     if not record.get("title") and not record.get("artist") and not record.get("isrc"):
         return render_template("manual_form.html", **_nav_context(fields=record, error="Enter at least a title, artist, or ISRC.")), 400
 
-    results = process_records([record], humanizer=_humanizer_if_requested())
+    results = process_records([record], humanizer=_humanizer_if_requested(), enricher=musicbrainz.enrich_by_isrc)
     return render_template("report.html", results=results, **summarize(results))
 
 
@@ -131,8 +131,8 @@ def spotify_validate():
     except spotify.SpotifyError as exc:
         return render_template("spotify_search.html", **_nav_context(configured=True, error=str(exc))), 502
 
-    results = process_records([record], humanizer=_humanizer_if_requested())
-    return render_template("report.html", results=results, source="Spotify", **summarize(results))
+    results = process_records([record], humanizer=_humanizer_if_requested(), enricher=musicbrainz.enrich_by_isrc)
+    return render_template("report.html", results=results, source="Spotify + MusicBrainz", **summarize(results))
 
 
 if __name__ == "__main__":

@@ -52,6 +52,29 @@ def test_summary_totals():
     assert stats["total_royalty_at_risk"] == 532.95
 
 
+def test_enricher_attaches_public_db_data():
+    def fake_enricher(isrc):
+        return {"found": True, "recording_title": "Lost In Lagos", "artists": "DJ Eko",
+                "composers": ["Jean Okafor"], "work_titles": ["Lost In Lagos"]}
+
+    (r,) = process_records([COMPOSER_MISSING_REGISTERED], enricher=fake_enricher)
+    assert r["mb"]["found"] is True
+    assert r["mb"]["composers"] == ["Jean Okafor"]
+
+
+def test_enricher_skipped_for_bad_isrc():
+    calls = []
+
+    def spy_enricher(isrc):
+        calls.append(isrc)
+        return {"found": False}
+
+    bad = {**COMPOSER_MISSING_REGISTERED, "isrc": "BADISRC"}
+    (r,) = process_records([bad], enricher=spy_enricher)
+    assert calls == []  # never called when the ISRC is invalid
+    assert r["mb"] is None
+
+
 def test_humanizer_is_applied_and_preserves_codes():
     def fake_humanizer(title, issues):
         return [{**i, "detail": "friendly: " + i["detail"]} for i in issues]

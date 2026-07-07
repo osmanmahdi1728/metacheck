@@ -3,11 +3,22 @@ import io
 import pytest
 
 from app import app as flask_app
+from validator import musicbrainz
 
 SAMPLE_CSV = (
     "title,artist,isrc,composer,publisher,genre,release_date,explicit,ai_generated,language,streams\n"
     "Lost In Lagos,DJ Eko,FR-Z03-24-00001,,Universal Africa,Afrobeats,2099-12-25,true,false,en,340000\n"
 )
+
+
+@pytest.fixture(autouse=True)
+def stub_musicbrainz(monkeypatch):
+    """Never hit the real MusicBrainz API during tests."""
+    monkeypatch.setattr(
+        musicbrainz,
+        "enrich_by_isrc",
+        lambda isrc: {"found": False, "recording_title": None, "artists": None, "composers": [], "work_titles": []},
+    )
 
 
 @pytest.fixture

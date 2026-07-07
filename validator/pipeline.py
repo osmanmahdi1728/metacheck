@@ -8,7 +8,7 @@ produce identical results. Steps per track:
   4. Optional plain-language rewrite (humanize.py)
 """
 from .cmo import check_registration
-from .rules import validate_track
+from .rules import normalize_isrc, validate_track
 from .royalty import estimate_risk, format_usd, parse_streams
 
 EXPECTED_COLUMNS = [
@@ -27,7 +27,7 @@ def process_dataframe(df, humanizer=None):
     return process_records(df.to_dict("records"), humanizer=humanizer)
 
 
-def process_records(records, humanizer=None):
+def process_records(records, humanizer=None, enricher=None):
     """Run the full validation + royalty pipeline over a list of dicts.
 
     This is the shared core for every input method (CSV upload, manual form,
@@ -38,6 +38,10 @@ def process_records(records, humanizer=None):
         humanizer: optional callable(track_title, issues) -> issues that
             rewrites issue detail strings (e.g. via GPT-4o-mini). When None,
             raw validator messages are used.
+        enricher: optional callable(isrc) -> dict with real metadata pulled
+            from a public database (e.g. MusicBrainz). Used to surface data
+            the submission is missing. Skipped for tracks without a usable
+            ISRC. Best used on single-track paths (it makes network calls).
 
     Returns:
         list of per-track result dicts consumed by the report template.
@@ -69,6 +73,13 @@ def process_records(records, humanizer=None):
                     "detail": f"The composer '{composer}' doesn't match the name on file at {cmo_info['cmo']} ('{cmo_info['registered_composer']}'). This can cause royalty splits to pay the wrong party.",
                 })
 
+        # Optional real-data enrichment (MusicBrainz) — only with a usable ISRC.
+        # Attached as its own field and shown as a distinct callout in the
+        # report, rather than mixed into the issue list.
+        mb = None
+        if enricher is not None and isrc and not have_isrc_issue:
+            mb = enricher(normalize_isrc(isrc))
+
         all_issues = errors + warnings
 
         # Royalty-at-risk estimate (keys off issue codes, so run before humanizing).
@@ -92,6 +103,7 @@ def process_records(records, humanizer=None):
             "royalty_at_risk": risk["amount"],
             "royalty_at_risk_display": format_usd(risk["amount"]),
             "royalty_breakdown": risk["breakdown"],
+            "mb": mb,
         })
     return results
 

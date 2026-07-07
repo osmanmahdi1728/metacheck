@@ -1,8 +1,28 @@
-from validator.rules import validate_track
+from validator.rules import is_valid_isrc, normalize_isrc, validate_track
 
 
 def codes(result):
     return {i["code"] for i in result["errors"] + result["warnings"]}
+
+
+def test_isrc_valid_with_and_without_hyphens():
+    # Same ISRC, two formats — both must be accepted.
+    assert is_valid_isrc("US-RC1-20-03059") is True
+    assert is_valid_isrc("USRC12003059") is True  # Spotify's un-hyphenated form
+
+
+def test_isrc_invalid_rejected():
+    assert is_valid_isrc("BADISRC") is False
+    assert is_valid_isrc("US-RC1-20-0305") is False  # too short
+
+
+def test_normalize_isrc_strips_separators():
+    assert normalize_isrc("us-rc1-20-03059") == "USRC12003059"
+
+
+def test_unhyphenated_isrc_passes_validation():
+    row = {**BASE_VALID, "isrc": "USRC12003059"}
+    assert "ISRC_INVALID_FORMAT" not in codes(validate_track(row))
 
 
 BASE_VALID = {

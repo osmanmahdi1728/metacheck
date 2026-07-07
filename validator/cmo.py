@@ -12,13 +12,19 @@ partnerships/APIs are available. The rest of the pipeline is unchanged.
 import csv
 import os
 
+from .rules import normalize_isrc
+
 _REGISTRY_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cmo_registry.csv")
 
 _registry_cache = None
 
 
 def _load_registry():
-    """Load {isrc: {cmo, work_title, registered_composer}} from the mock CSV."""
+    """Load {isrc: {cmo, work_title, registered_composer}} from the mock CSV.
+
+    Keys are normalized (hyphens stripped) so lookups match regardless of ISRC
+    formatting.
+    """
     global _registry_cache
     if _registry_cache is not None:
         return _registry_cache
@@ -27,7 +33,7 @@ def _load_registry():
     if os.path.exists(_REGISTRY_PATH):
         with open(_REGISTRY_PATH, newline="") as f:
             for row in csv.DictReader(f):
-                isrc = (row.get("isrc") or "").strip().upper()
+                isrc = normalize_isrc(row.get("isrc"))
                 if isrc:
                     registry[isrc] = {
                         "cmo": (row.get("cmo") or "").strip(),
@@ -45,7 +51,7 @@ def check_registration(isrc):
         dict: {registered: bool, cmo: str|None, registered_composer: str|None}
     """
     registry = _load_registry()
-    record = registry.get((isrc or "").strip().upper())
+    record = registry.get(normalize_isrc(isrc))
     if record:
         return {
             "registered": True,

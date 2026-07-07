@@ -1,6 +1,22 @@
 import re
 from datetime import datetime, date
 
+# An ISRC is 12 chars: 2-letter country + 3 alphanumeric registrant + 2-digit
+# year + 5-digit designation. It's valid with or without hyphen separators
+# (e.g. "USRC12003059" and "US-RC1-20-03059" are the same code). We normalize
+# before checking so both forms pass — Spotify returns the un-hyphenated form.
+_ISRC_NORMALIZED_RE = re.compile(r'^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$')
+
+
+def normalize_isrc(value):
+    """Uppercase and strip separators so ISRC forms compare equal."""
+    return re.sub(r'[^A-Z0-9]', '', str(value or "").upper())
+
+
+def is_valid_isrc(value):
+    return bool(_ISRC_NORMALIZED_RE.match(normalize_isrc(value)))
+
+
 VALID_GENRES = [
     "Afro House", "Amapiano", "Afrobeats", "Afropop", "Highlife",
     "Pop", "Hip-Hop", "R&B", "Electronic", "Dance", "World",
@@ -46,11 +62,10 @@ def validate_track(row):
 
     # ISRC
     isrc = str(row.get("isrc", "")).strip()
-    isrc_pattern = re.compile(r'^[A-Z]{2}-[A-Z0-9]{3}-\d{2}-\d{5}$')
     if not isrc or isrc.lower() == "nan":
         errors.append({"field": "isrc", "code": "ISRC_MISSING", "detail": "ISRC code is missing. This is required for royalty tracking on all platforms."})
-    elif not isrc_pattern.match(isrc):
-        errors.append({"field": "isrc", "code": "ISRC_INVALID_FORMAT", "detail": f"ISRC '{isrc}' does not match the required format (e.g. QZ-ES1-26-00001)."})
+    elif not is_valid_isrc(isrc):
+        errors.append({"field": "isrc", "code": "ISRC_INVALID_FORMAT", "detail": f"ISRC '{isrc}' is not a valid 12-character ISRC (e.g. QZ-ES1-26-00001 or QZES1260001)."})
 
     # Composer
     composer = str(row.get("composer", "")).strip()

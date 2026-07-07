@@ -25,6 +25,15 @@ same validation engine:
    or CMO registration, so those gaps show up live. (Requires free Spotify
    credentials; see below.)
 
+### Real-data enrichment (MusicBrainz)
+
+For the manual and Spotify paths, MetaCheck cross-references the track's ISRC
+against **MusicBrainz** (the open music database, no API key needed) to pull
+the real composer/work data. This powers the strongest insight: Spotify gives
+the ISRC, MusicBrainz knows the composers — but if the distribution submission
+left the composer blank, no CMO can match the royalties. The report shows a
+callout naming the composers found in public databases.
+
 ## What it checks
 
 - **Metadata rules** — ISRC format, contributor completeness, genre, explicit
@@ -57,6 +66,7 @@ metacheck/
 │   ├── cmo.py                  # CMO registration lookup
 │   ├── royalty.py              # royalty-at-risk estimator
 │   ├── spotify.py              # Spotify track lookup (optional)
+│   ├── musicbrainz.py          # real composer/work enrichment by ISRC
 │   ├── humanize.py             # optional GPT-4o-mini plain-language layer
 │   └── pipeline.py             # shared processing (CSV, manual, Spotify)
 ├── templates/
